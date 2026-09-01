@@ -3,22 +3,19 @@ name = "mlops-flight-predictor"
 version = "0.1.0"
 description = "Indian domestic flight price prediction (XGBoost + TTR)"
 readme = "README.md"
+requires-python = ">=3.13"
+
 authors = [
     { name = "Ahmed Al-Shobaki", email = "ahmedelshobakey711@gmail.com" }
 ]
 
-[tool.uv.build-backend]
-module-name = "mlops_flight_predictor"
-module-root = "src"
-
-requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.141.1",
     "joblib>=1.6.0",
     "numpy>=2.5.2",
     "onnxmltools>=1.16.0",
     "onnxruntime>=1.29.0",
-    "pandas>=3.0.5",
+    "pandas>=2.2,<3",
     "pydantic>=2.13.5",
     "python-multipart>=0.0.32",
     "scikit-learn>=1.9.0",
@@ -30,11 +27,12 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "httpx>=0.28.1",
-    "mypy>=2.3.1",
+    "mypy>=1.18.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.5",
 ]
+
 experiments = [
     "dvc>=3.67.1",
     "dvc-s3>=3.3.0",
@@ -42,16 +40,17 @@ experiments = [
 ]
 
 [project.scripts]
-mlops-flight-train = "mlops_flight_predictor.train:main"
-mlops-flight-predict = "mlops_flight_predictor.predict:main"
-mlops-flight-export = "mlops_flight_predictor.export:main"
+mlops-flight-train = "flight_predictor.train:main"
+mlops-flight-predict = "flight_predictor.predict:main"
+mlops-flight-export = "flight_predictor.export:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/mlops_flight_predictor"]
+[tool.uv.build-backend]
+module-name = "flight_predictor"
+module-root = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=mlops_flight_predictor --cov-report=term-missing"
+addopts = "-v --cov=flight_predictor --cov-report=term-missing"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP"]
