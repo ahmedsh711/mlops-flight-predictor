@@ -7,7 +7,16 @@ authors = [
     { name = "Ahmed Al-Shobaki", email = "ahmedelshobakey711@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.141.1",
+    "joblib>=1.6.0",
+    "numpy>=2.5.2",
+    "pandas>=3.0.5",
+    "pydantic>=2.13.5",
+    "scikit-learn>=1.9.0",
+    "uvicorn>=0.52.4",
+    "xgboost>=3.4.1",
+]
 
 [project.scripts]
 mlops-flight-predictor = "mlops_flight_predictor:main"
