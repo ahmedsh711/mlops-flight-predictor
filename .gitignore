@@ -1,0 +1,49 @@
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+#Data - tracked by DVC 
+data/raw/*.csv
+data/processed/*.csv
+data/raw/*.parquet
+data/processed/*.parquet
+
+# Models - tracked by DVC
+models/*.joblib
+models/*.onnx
+models/*.pkl
+
+# Secerts 
+.env
+*.env
+secerts/
+credentials.json
+
+# MLflow artifacts
+mlruns/
+mlartifacts/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# DVC
+.dvc/cache
+.dvc/tmp
