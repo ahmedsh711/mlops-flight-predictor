@@ -36,7 +36,7 @@ def setup_logging(level: str = "INFO", fmt: str= "json") -> None:
         structlog.processors.format_exc_info
     ]
 
-    if fmt = "json":
+    if fmt == "json":
         renderer = structlog.processors.JSONRenderer()
     else:
         renderer = structlog.dev.ConsoleRenderer(colors=True)
@@ -75,10 +75,10 @@ class correlationIDMiddleware:
     def __init__(self, app) -> None:
         self.app = app
 
-    asyn def __call__(self, scope, recieve, send) -> None:
+    async def __call__(self, scope, receive, send) -> None:
         if scope["type"] == 'http':
             headers = dict(scope.get("headers",[]))
             cid_bytes = headers.get(b"x-correlation-id")
             cid = cid_bytes.decode() if cid_bytes else str(uuid.uuid4())
             set_correlation_id(cid)
-        await self.app(scope, recieve, send)
+        await self.app(scope, receive, send)
