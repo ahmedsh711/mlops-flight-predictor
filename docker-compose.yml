@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+
+# Flight Price Prediction API:
+  flight-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: flight-price-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models:ro # mount models read-only; no rebuilding image when model changes
+    environment:
+      - LOG_FORMAT=json
+      - LOG_LEVEL=INFO
+      - FLIGHT_USE_ONNX=false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urlib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+#Mlflow Tracking server:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.12.0
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns
+      - ./mlartifacts:/mlartifacts
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlruns/mlflow.db
+      - MLFLOW_ARTIFACT_ROOT=/mlartifacts
+    command: >
+      mlflow server
+        --backend-store-uri sqlite:///mlruns/mlflow.db
+        --artifact-root /mlartifacts
+        --host 0.0.0.0
+        --port 5000
+    restart: unless-stopped
