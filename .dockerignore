@@ -1,0 +1,18 @@
+# Ignore these when building the Docker image [Smaller Build context = faster builds]
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Data
+data/raw/
+data/preprocessed/
+
+# Development files
+notebooks/
+experiments/
+.github/
+tests/
+.git
