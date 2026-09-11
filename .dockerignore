@@ -15,4 +15,16 @@ notebooks/
 experiments/
 .github/
 tests/
-.git
+.git/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Secerts
+.env
+*.env
+
+# OS
+.DS_Stores
+Thumbs.db
