@@ -11,7 +11,7 @@ Key design patterns:
 import json
 import logging
 import os
-from contextlib import asynccontextmanger
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -33,27 +33,29 @@ logger = logging.getLogger(__name__)
 app_state: dict[str, Any] = {}
 
 # Lifespan:
-@async def lifespan(app: FastAPI):
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # Startup:
     setup_logging(
-        level=os.getenv("LOG_LEVEL", "INFO")
+        level=os.getenv("LOG_LEVEL", "INFO"),
         fmt=os.getenv("LOG_FORMAT", "json")
     )
     logger.info("Flight Price starting up ...")
 
-    use_onnx = os.getenv("FLIGHT_USE_ONNX", "false").lower() == "true"
-    try:
-        predictor = load_predictor(use_onnx=use_onnx)
-        app_state["predictor"] = predictor
-        logger.info(
-            "Predictor loaded sucessfully"
-            extra={'predictor_type': predictor.__class__.__name__}
-        )
-    except FileNotFound as e:
-        logger.error(f"Failed to load predictor: {e}")
-        # App starts but prediction will return 503
-        app_state["predictor"] = None
-        app_state["load_error"] = str(e)
+    if app_state.get("predictor") is None:
+        use_onnx = os.getenv("FLIGHT_USE_ONNX", "false").lower() == "true"
+        try:
+            predictor = load_predictor(use_onnx=use_onnx)
+            app_state["predictor"] = predictor
+            logger.info(
+                "Predictor loaded sucessfully",
+                extra={'predictor_type': predictor.__class__.__name__}
+            )
+        except FileNotFoundError as e:
+            logger.error(f"Failed to load predictor: {e}")
+            # App starts but prediction will return 503
+            app_state["predictor"] = None
+            app_state["load_error"] = str(e)
 
     yield
 
@@ -82,7 +84,7 @@ app = FastAPI(
 app.add_middleware(CorrelationIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_orginis=["*"],
+    allow_origins=["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"]
 )
@@ -96,22 +98,31 @@ async def health_check():
             status_code=503,
             content={
                 "status": "unhealthy",
-                "model_loaded": True,
-                "predictor_type": predictor.__class__.__name__,
+                "model_loaded": False,
                 "version": API_VERSION
             }
         )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "healthy",
+            "model_loaded": True,
+            "predictor_type": predictor.__class__.__name__,
+            "version": API_VERSION
+        }
+    )
 
 @app.get("/model-info", tags=["Infrastructure"])
-async def model-info():
+async def model_info():
     if not MODEL_INFO_PATH.exists():
         raise HTTPException(
             status_code=404,
-            detail="model_info.json not found. Run `flight-train` frist."
+            detail="model_info.json not found. Run `flight-train` first."
         )
 
     with open(MODEL_INFO_PATH) as f:
-        info = json.load(f)
+        content = f.read().replace(": NaN", ": null").replace(": nan", ": null")
+        info = json.loads(content)
     
     return info
 
@@ -145,7 +156,7 @@ async def predict(request: Request):
     logger.info(
         "Prediction served.",
         extra={
-            "predicted_price_INR": result["predicted_price_inr"]
+            "predicted_price_INR": result["predicted_price_inr"],
             "airline": flight_request.airline.value,
             "source": flight_request.source.value,
             "destination": flight_request.destination.value,
@@ -167,12 +178,20 @@ async def predict_batch(request: Request):
     if not isinstance(body, list):
         raise HTTPException(status_code=422, detail="Body must be a JSON array")
 
+    predictor: BaseFlightPredictor | None = app_state.get("predictor")
+    if predictor is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model not loaded. Check /health for details."
+        )
+
     results = []
     for i, item in enumerate(body):
-        try: flight_request = FlightPredictionRequest(**item)
-        result = predictor.predict_safe(flight_request.to_dataframe())
-        results.append({"index": i, **result})
-    except Exception as e:
-        results.append({"index": i, "status": "error", "error": str(e)})
+        try:
+            flight_request = FlightPredictionRequest(**item)
+            result = predictor.predict_safe(flight_request.to_dataframe())
+            results.append({"index": i, **result})
+        except Exception as e:
+            results.append({"index": i, "status": "error", "error": str(e)})
 
     return {"predictions": results, "total": len(results)}

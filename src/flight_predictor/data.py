@@ -50,8 +50,8 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
     missing = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing:
         raise ValueError(
-            f"CSV is required columns: {missing}. "
-            f"Found: {list(df.columns)"
+            f"CSV is missing required columns: {missing}. "
+            f"Found: {list(df.columns)}"
         )
 
     # Basic shape validation:
@@ -70,10 +70,10 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
     if PRICE_COLUMN in df.columns:
         n_before = len(df)
 
-        df = df(
+        df = df[
             (df[PRICE_COLUMN] >= MIN_PRICE_INR) &
             (df[PRICE_COLUMN] <= MAX_PRICE_INR)
-        )
+        ]
 
         n_dropped = n_before - len(df)
         if n_dropped > 0:

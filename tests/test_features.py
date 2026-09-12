@@ -37,7 +37,7 @@ class TestParseDuration:
         assert parse_duration_to_minutes(165) == 165 # integer input
 
 ## parse_stops:
-class TestParseStops(self):
+class TestParseStops:
     def test_non_stops(self):
         assert parse_stops("non-stops") == 0
     
@@ -63,20 +63,20 @@ class TestAirportCoords:
         assert lon == 0.0
 
     def test_case_insensitive(self):
-        lat1, - = get_airport_coords("DEL")
-        lat2, - = get_airport_coords("del")
+        lat1, _ = get_airport_coords("DEL")
+        lat2, _ = get_airport_coords("del")
         assert lat1 == lat2
 
 ## engineer_features:
 class TestEngineerFeatures:
     def test_returns_new_dataframe(self, sample_df):
-       """engineer_features should not modify the original DataFrame."""
+        """engineer_features should not modify the original DataFrame."""
         original_cols = list(sample_df.columns)
         result = engineer_features(sample_df)
-        assert list(sample_df.columns) == orginal_cols
+        assert list(sample_df.columns) == original_cols
         assert "duration_minutes" in result.columns
 
-    def test_duration_minutes_correct(self, sample_df)
+    def test_duration_minutes_correct(self, sample_df):
         result = engineer_features(sample_df)
         assert result["duration_minutes"].iloc[0] == 165
 
@@ -84,7 +84,7 @@ class TestEngineerFeatures:
         result = engineer_features(sample_df)
         assert "journey_day" in result.columns
         assert "journey_month" in result.columns
-        assert "dep_hour" in result,columns
+        assert "dep_hour" in result.columns
 
     def test_price_column_not_required(self, sample_df):
         df_no_price = sample_df.drop(columns = ["Price"], errors="ignore")

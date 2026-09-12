@@ -59,8 +59,8 @@ def build_pipeline(xgb_params: dict[str, Any] | None = None) -> Pipeline:
 
     # TTR wraps XGBoost — applies log1p before fit, expm1 after predict
     ttr_model = TTR(
-        regressor = XGBRegressor(**xgb_param),
-        func = np.logp1,
+        regressor = XGBRegressor(**xgb_params),
+        func = np.log1p,
         inverse_func = np.expm1
     )
 
@@ -74,14 +74,14 @@ def evaluate_model(pipeline : Pipeline, X_test: pd.DataFrame, y_test: pd.Series)
     y_pred = pipeline.predict(X_test)
 
     r2 = r2_score(y_test, y_pred)
-    rmse = mean_squared_error(y_test, y_pred, squared = False)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
     mae = mean_absolute_error(y_test, y_pred)
 
-    return(
-        "r2_inr_space" : round(r2, 4),
-        "rmse_inr" : round(rmse, 4),
-        "mae_inr" : round(mae, 4) 
-    )
+    return {
+        "r2_inr_space": round(r2, 4),
+        "rmse_inr": round(rmse, 4),
+        "mae_inr": round(mae, 4)
+    }
 
 def train(data_path: Path | None = None) -> dict[str, Any]:
     """
@@ -100,7 +100,7 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
 
     # 2- Feature_Engineering:
     df = engineer_features(df_raw)
-    features_cols = get_features_columns()
+    feature_cols = get_feature_columns()
 
     # validate all feature columns exist after engineering
     missing_feats = set(feature_cols) - set(df.columns)
@@ -157,7 +157,7 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
     joblib.dump(pipeline, PIPELINE_PATH)
 
     # Save preprocessor separetly (for onnx export):
-    preprocessor_fitted = pipeline.named_steps["preprocessed"]
+    preprocessor_fitted = pipeline.named_steps["preprocessor"]
     joblib.dump(preprocessor_fitted, MODELS_DIR/ "preprocessor.joblib")
 
     # save model info
@@ -167,13 +167,16 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
         "cv_std_r2": round(cv_scores.std(), 4),
         "feature_count": X_train.shape[1],
         "train_size": len(X_train),
-        "r2_threshold" : R2_THRESHOLD,
-        "random_seed" : RANDOM_SEED,
-        "xgb_params" : pipeline.named_steps["model"].regressor.get_params()
+        "r2_threshold": R2_THRESHOLD,
+        "random_seed": RANDOM_SEED,
+        "xgb_params": {
+            k: (None if isinstance(v, float) and np.isnan(v) else v)
+            for k, v in pipeline.named_steps["model"].regressor.get_params().items()
+        }
     }
 
     with open(MODEL_INFO_PATH, "w") as f:
-        json.dump(model_info, f, indet=2)
+        json.dump(model_info, f, indent=2)
 
     logger.info(
         "Training complete. Artifact saved.",

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from flight_predictor.config import ONNX_MODEL_PATH, PIPELINE_PATH, MODELS_DIR
-from flight_predictor.features import engineer_features, get_features_columns
+from flight_predictor.features import engineer_features, get_feature_columns
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ class BaseFlightPredictor(ABC):
     def predict_safe(self, input_df: pd.DataFrame) -> dict:
         try:
             price = self.predict(input_df)
-            return{
-                "predicted_price_inr" : round(float(price), 2),
-                "predictor_type" : self.__class__.__name__,
+            return {
+                "predicted_price_inr": round(float(price), 2),
+                "predictor_type": self.__class__.__name__,
                 "status": "success"
             }
         except Exception as e:
@@ -32,7 +32,7 @@ class BaseFlightPredictor(ABC):
             raise RuntimeError(f"Prediction failed: {e}") from e
 
 ## Sklearn Pipeline Predictor
-class sklearnPredictor(BaseFlightPredictor):
+class SklearnPredictor(BaseFlightPredictor):
     def __init__(self, model_path: Path | None = None) -> None:
         path = model_path or PIPELINE_PATH
         if not path.exists():
@@ -44,14 +44,18 @@ class sklearnPredictor(BaseFlightPredictor):
 
     def predict(self, input_df: pd.DataFrame) -> float:
         features = engineer_features(input_df)
-        features_cols = get_features_cols()
+        feature_cols = get_feature_columns()
         X = features[feature_cols]
         price = self._pipeline.predict(X)
         return float(price[0])
 
 ## ONNX Predictor
 class OnnxPredictor(BaseFlightPredictor):
-    def __init__ (self, onnx_path: Path | None = None, preprocessor_path = preprocessor_path or (MODELS_DIR / "preprocessor.joblib")) -> None:
+    def __init__(
+        self,
+        onnx_path: Path | None = None,
+        preprocessor_path: Path | None = None
+    ) -> None:
         import onnxruntime as rt
 
         onnx_path = onnx_path or ONNX_MODEL_PATH
@@ -70,30 +74,30 @@ class OnnxPredictor(BaseFlightPredictor):
 
         self._session = rt.InferenceSession(
             str(onnx_path),
-            providers = ["CPUExecutionProvider"]
+            providers=["CPUExecutionProvider"]
         )
 
         self._preprocessor = joblib.load(preprocessor_path)
         self._input_name = self._session.get_inputs()[0].name
         logger.info("ONNX predictor loaded", extra={"path": str(onnx_path)})
 
-        def predict(self, input_df: pd.DataFrame) -> float:
-            features = feature_engineer(input_df)
-            features_cols = get_features_columns()
-            X = features[features_cols]
+    def predict(self, input_df: pd.DataFrame) -> float:
+        features = engineer_features(input_df)
+        feature_cols = get_feature_columns()
+        X = features[feature_cols]
 
-            # Sklearn preprocessor : handle ohe + scaling 
-            X_transformed = self._preprocessor.transform(X).astype(np.float32)
+        # Sklearn preprocessor : handle ohe + scaling 
+        X_transformed = self._preprocessor.transform(X).astype(np.float32)
 
-            # ONNX inference: return log-scale price
-            outputs = self._session.run(
-                None,
-                {self._input_name: X_transformed}
-            )
+        # ONNX inference: return log-scale price
+        outputs = self._session.run(
+            None,
+            {self._input_name: X_transformed}
+        )
 
-            log_price = outputs[0][1] # shape(1,) or scaler
+        log_price = outputs[0].flatten()[0]
 
-            return float(np.expm1(log_price))
+        return float(np.expm1(log_price))
 
     
 # Factory Function for FastAPI startup:
@@ -113,9 +117,9 @@ def load_predictor(use_onnx: bool = False) -> BaseFlightPredictor:
     return SklearnPredictor()
 
 def main() -> None:
-    """ Quick Somke Test"""
+    """ Quick Smoke Test"""
 
-    from flight_predictor.logging_config import setup_logging
+    from flight_predictor.logging_conf import setup_logging
     setup_logging()
 
     # Sample flight: IndiGo, Delhi to Bangalore, 1 stop, 2h 45m
@@ -132,7 +136,9 @@ def main() -> None:
         "Additional_Info": "No info",
     }])
 
-    predictor = load_predictor()
+    import os
+    use_onnx = os.getenv("FLIGHT_USE_ONNX", "false").lower() == "true"
+    predictor = load_predictor(use_onnx=use_onnx)
     result = predictor.predict_safe(sample)
     print(f"\n Sample prediction: {result['predicted_price_inr']:,.0f} INR")
 

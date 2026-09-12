@@ -1,6 +1,5 @@
 import logging
 import sys
-import build
 import uuid
 from contextvars import ContextVar
 
@@ -19,14 +18,14 @@ def set_correlation_id(cid: str | None = None) -> str:
     correlation_id_var.set(cid)
     return cid
 
-def add_correlation_id(Logger, method, event_dict: dict) -> dict:
+def add_correlation_id(logger, method_name, event_dict: dict) -> dict:
     event_dict["correlation_id"] = get_correlation_id()
     return event_dict
 
-def setup_logging(level: str = "INFO", fmt: str= "json") -> None:
+def setup_logging(level: str = "INFO", fmt: str = "json") -> None:
     log_level = getattr(logging, level.upper(), logging.INFO)
     
-    # Shared precessor applied to every log event
+    # Shared processor applied to every log event
     shared_processors = [
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -43,10 +42,10 @@ def setup_logging(level: str = "INFO", fmt: str= "json") -> None:
 
     structlog.configure(
         processors=shared_processors + [
-            structlog.stdlib.ProcessorFormater.wrap_for_formatter
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter
         ],
-        logger_factory = structlog.stdlib.LoggerFactory(),
-        cache_logger_on_first_use = True
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True
     )
 
     formatter = structlog.stdlib.ProcessorFormatter(
@@ -66,7 +65,7 @@ def setup_logging(level: str = "INFO", fmt: str= "json") -> None:
     logging.getLogger("xgboost").setLevel(logging.WARNING)
 
 # FastAPI Middleware:
-class correlationIDMiddleware:
+class CorrelationIDMiddleware:
     """
     ASGI middleware that assigns a unique correlation_id to every request.
     The ID is taken from the X-Correlation-ID header if present,

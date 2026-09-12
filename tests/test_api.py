@@ -33,21 +33,21 @@ class TestHealthEndpoint:
             assert response.status_code == 503
         finally:
             if original is not None:
-                app_state["predictor"] = orginal
+                app_state["predictor"] = original
 
 
 class TestPredictorEndpoint:
     def test_valid_request_returns_200(self, test_client):
-        reponse = test_client.post("/predict". json=VALID_PAYLOAD)
-        assert reponse.status_code == 200
+        response = test_client.post("/predict", json=VALID_PAYLOAD)
+        assert response.status_code == 200
 
-    def test_reponse_contains_price(self, test_client):
-        reponse = test_client.post("/predict", json=VALID_PAYLOAD)
+    def test_response_contains_price(self, test_client):
+        response = test_client.post("/predict", json=VALID_PAYLOAD)
         data = response.json()
         assert "predicted_price_inr" in data
         assert data['predicted_price_inr'] == 5500.0 # from mock
 
-    def test_reponse_contains_request_id(self, test_client):
+    def test_response_contains_request_id(self, test_client):
         response = test_client.post("/predict", json=VALID_PAYLOAD)
         data = response.json()
         assert "request_id" in data

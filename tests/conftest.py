@@ -39,6 +39,20 @@ def sample_batch_df(sample_raw_flight):
     ]
     return pd.DataFrame(rows)
 
+@pytest.fixture
+def sample_df(sample_raw_flight):
+    """Single-row DataFrame fixture."""
+    return pd.DataFrame([sample_raw_flight])
+
+@pytest.fixture(scope="module")
+def sklearn_pipeline():
+    """Trained sklearn pipeline fixture."""
+    import joblib
+    from flight_predictor.config import PIPELINE_PATH
+    if not PIPELINE_PATH.exists():
+        pytest.skip("Pipeline artifact not found")
+    return joblib.load(PIPELINE_PATH)
+
 ## Mock predictor fixture
 @pytest.fixture
 def mock_predictor():
@@ -65,7 +79,7 @@ def test_client(mock_predictor):
     # Inject Mock Predictor directly into app_state
     app_state["predictor"] = mock_predictor
 
-    with TestClient(app, raise_server_exception=False) as client:
+    with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
     # Clean Up after test

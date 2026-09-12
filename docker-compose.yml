@@ -18,7 +18,7 @@ services:
       - LOG_LEVEL=INFO
       - FLIGHT_USE_ONNX=false
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urlib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

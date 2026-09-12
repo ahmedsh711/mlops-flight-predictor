@@ -52,34 +52,47 @@ def extract_date_features(df: pd.DataFrame) -> pd.DataFrame:
     df= df.copy()
 
     # Journey date features
-    journey_dt = pd.to_datetime(df"Date_of_Time", dayfirst=True, errors="coerce")
+    journey_dt = pd.to_datetime(df["Date_of_Journey"], dayfirst=True, errors="coerce")
     df["journey_day"] = journey_dt.dt.day
     df["journey_month"] = journey_dt.dt.month
     df["journey_day_of_week"] = journey_dt.dt.dayofweek # 0= Mon, 6=Sun
 
-    # Depture time features
+    # Departure time features
     dep_dt = pd.to_datetime(df["Dep_Time"], format="%H:%M", errors='coerce')
     df["dep_hour"] = dep_dt.dt.hour
     df["dep_minute"] = dep_dt.dt.minute
 
-    return df
-
     # Arrival time features
-    arr_dt = pd.to_datetime(df["arr_Time"], format="%H:%M", errors='coerce')
+    arr_str = df["Arrival_Time"].astype(str).str.split().str[0]
+    arr_dt = pd.to_datetime(arr_str, format="%H:%M", errors='coerce')
     df["arrival_hour"] = arr_dt.dt.hour
     df["arrival_minute"] = arr_dt.dt.minute
 
     return df
 
 
+CITY_TO_AIRPORT: dict[str, str] = {
+    "BANGALORE": "BLR",
+    "BANGLORE": "BLR",
+    "DELHI": "DEL",
+    "NEW DELHI": "DEL",
+    "MUMBAI": "BOM",
+    "CHENNAI": "MAA",
+    "KOLKATA": "CCU",
+    "COCHIN": "COK",
+    "HYDERABAD": "HYD",
+}
+
 def get_airport_coords(code: str) -> tuple[float, float]:
     """
-    Return (latitude, longitude) for an airport code.
+    Return (latitude, longitude) for an airport code or city name.
     Falls back to (0.0, 0.0) if code is unknown — does NOT call any API.
     """
-    return AIR_COORDS.get(str(code).strip().upper(), (0.0,0.0))
+    key = str(code).strip().upper()
+    key = CITY_TO_AIRPORT.get(key, key)
+    return AIRPORT_COORDS.get(key, (0.0, 0.0))
 
-def compute_route_distance(source:str, dest:str) -> float:
+def compute_route_distance(source: str, dest: str) -> float:
     """
     Compute approximate great-circle distance between two airports in km.
     Uses Haversine formula — no external API calls.
@@ -92,13 +105,13 @@ def compute_route_distance(source:str, dest:str) -> float:
     # Haversine Formula:
     R = 6371.0 # Earth radius in KM
     phi1, phi2 = math.radians(src_lat), math.radians(dst_lat)
-    d_phi1 = math.radians(dst_lat - src_kat)
+    d_phi1 = math.radians(dst_lat - src_lat)
     d_lam  = math.radians(dst_lon - src_lon)
 
-    a = (math.sin(d_phi /2) **2
-         + math.cos(phi1) * math.cos(phi2) * math.sin(d_lam / 2) **2)
+    a = (math.sin(d_phi1 / 2) ** 2
+         + math.cos(phi1) * math.cos(phi2) * math.sin(d_lam / 2) ** 2)
 
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 ## DataFrame transformation (applies all pure functions)
 
@@ -129,7 +142,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     df["airline_clean"] = df['Airline'].where(
-        df["Airline"].isin(KNOWN_AIRLINES), other="Others"
+        df["Airline"].isin(KNOWN_AIRLINES), other="Other"
     )
 
     return df
@@ -137,9 +150,9 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 ## scikit-learn ColumnTransformer - handle encoding for model
 # Features used by the model (in order):
 NUMERIC_FEATURES = [
-    "duration_mintues", "n_stops", "route_distance_km", "avg_speed_kmh",
+    "duration_minutes", "n_stops", "route_distance_km", "avg_speed_kmh",
     "journey_day", "journey_month", "journey_day_of_week",
-    "dep_hour", "dep_minutes", "arrival_hour", "arrival_minute"
+    "dep_hour", "dep_minute", "arrival_hour", "arrival_minute"
 ]
 
 CATEGORICAL_FEATURES = ["airline_clean", "Source", "Destination"]
@@ -159,17 +172,17 @@ def build_preprocessor() -> ColumnTransformer:
 
     categorical_transformer = Pipeline([
         ("ohe", OneHotEncoder(
-            handle_unkown = "ignore",
-            sparse_output = False
+            handle_unknown="ignore",
+            sparse_output=False
         ))
     ])
 
     return ColumnTransformer(
-        transformers = [
-            ("num", numer_transformer, NUMERIC_FEATURES),
+        transformers=[
+            ("num", numeric_transformer, NUMERIC_FEATURES),
             ("cat", categorical_transformer, CATEGORICAL_FEATURES)
         ],
-        reminder="drop"
+        remainder="drop"
     )
 
 def get_feature_columns() -> list[str]:

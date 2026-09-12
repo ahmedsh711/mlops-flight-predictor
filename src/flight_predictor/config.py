@@ -1,4 +1,4 @@
-from pathlib import path
+from pathlib import Path
 
 # Project Root
 # __file__ = .../src/flight_predictor/config.py

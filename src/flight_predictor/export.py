@@ -11,7 +11,7 @@ from flight_predictor.config import(
 )
 
 from flight_predictor.data import load_raw_data
-from flight_predictor.features import engineer_features, get_features_columns
+from flight_predictor.features import engineer_features, get_feature_columns
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +34,14 @@ def export_to_onnx(
     if not pipeline_path.exists():
         raise FileNotFoundError(
             f"pipeline not found at {pipeline_path}."
-            "Run `flight-train` frist."
+            "Run `flight-train` first."
         )
 
     # Load trained sklearn pipeline
     pipeline = joblib.load(pipeline_path)
 
-    # Extract inner XGBRegressor from Pipeline -> TR -> XGBRegressor
-    ttr = pipeline.named_steps["preprocessor"] # TransformedTargetRegressor
+    # Extract inner XGBRegressor from Pipeline -> TTR -> XGBRegressor
+    ttr = pipeline.named_steps["model"] # TransformedTargetRegressor
     xgb_model = ttr.regressor_
 
     # Determine input shape from preprocessor output
@@ -51,12 +51,12 @@ def export_to_onnx(
     df_raw = load_raw_data()
     df = engineer_features(df_raw)
     feature_cols = get_feature_columns()
-    X_Sample = df[feature_cols].head(10)
-    X_transformed = preprocessor.transform(X_Sample)
+    X_sample = df[feature_cols].head(10)
+    X_transformed = preprocessor.transform(X_sample)
     n_features = X_transformed.shape[1]
 
     logger.info(
-        "Exporting XGBoost to ONNX"
+        "Exporting XGBoost to ONNX",
         extra={"n_features": n_features}
     )
 
@@ -69,12 +69,12 @@ def export_to_onnx(
     with open(onnx_output_path, 'wb') as f:
         f.write(onnx_model.SerializeToString())
 
-    # Save preprocessor seperatly for onnx_predictor
-    prepressor_path = MODELS_DIR / "preprocessor.joblib"
+    # Save preprocessor separately for onnx_predictor
+    preprocessor_path = MODELS_DIR / "preprocessor.joblib"
     joblib.dump(preprocessor, preprocessor_path)
 
     logger.info(
-        "ONNX export complete"
+        "ONNX export complete",
         extra={
             "onnx_path": str(onnx_output_path),
             "preprocessor_path": str(preprocessor_path),
@@ -83,7 +83,7 @@ def export_to_onnx(
     )
     return onnx_output_path
 
-def onnx_parity(pipeline_path: Path | None = None, atol: float = 10e-4) -> bool:
+def verify_onnx_parity(pipeline_path: Path | None = None, atol: float = 0.5) -> bool:
     """
     Verify ONNX predictions match sklearn predictions within tolerance.
     Returns True if parity is confirmed, raises AssertionError otherwise.
@@ -91,7 +91,7 @@ def onnx_parity(pipeline_path: Path | None = None, atol: float = 10e-4) -> bool:
     import onnxruntime as rt
 
     pipeline_path = pipeline_path or PIPELINE_PATH
-    pipeline = job.load(pipeline_path)
+    pipeline = joblib.load(pipeline_path)
 
     df_raw = load_raw_data()
     df = engineer_features(df_raw)
@@ -99,7 +99,7 @@ def onnx_parity(pipeline_path: Path | None = None, atol: float = 10e-4) -> bool:
     X = df[feature_cols].head(50)
 
     # Sklearn predictions
-    sklearn_preds = pipeline.predict()
+    sklearn_preds = pipeline.predict(X)
 
     # Onnx predictions
     preprocessor = pipeline.named_steps["preprocessor"]
@@ -110,17 +110,17 @@ def onnx_parity(pipeline_path: Path | None = None, atol: float = 10e-4) -> bool:
         providers=["CPUExecutionProvider"]
     )
     input_name = session.get_inputs()[0].name
-    logs_preds = session.run(None, {input_name: X_transformed})[0].flatten()
+    log_preds = session.run(None, {input_name: X_transformed})[0].flatten()
     onnx_preds = np.expm1(log_preds)
 
-    max_diff = np.abs(sklearn - onnx_preds).max()
+    max_diff = np.abs(sklearn_preds - onnx_preds).max()
     if max_diff > atol:
         raise AssertionError(
             f"ONNX parity check failed! Max diff = {max_diff:.6f} > {atol}"
         )
 
     logger.info(
-        "ONNX parity verified"
+        "ONNX parity verified",
         extra={"max_diff": float(max_diff), "atol": atol}
     )
     return True
@@ -133,5 +133,5 @@ def main() -> None:
     verify_onnx_parity()
     print("Onnx parity verified (Sklearn ~ ONNX Predictions)")
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     main()

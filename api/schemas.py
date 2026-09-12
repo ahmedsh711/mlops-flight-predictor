@@ -43,21 +43,21 @@ class FlightPredictionRequest(BaseModel):
     date_of_journey: str=Field(... , description="Journey date (DD/MM/YYYY or YYYY-MM-DD)")
     source: CityEnum
     destination: CityEnum
-    dep_time: str = Filed(... , description = "Departure time (HH:MM)")
-    arrival_time: str = Field(... , description = "Arrival time (HH:MM)")
-    duration: str = Field(... , description = "Duration string like '2h 45m' or '45m")
+    dep_time: str = Field(..., description="Departure time (HH:MM)")
+    arrival_time: str = Field(..., description="Arrival time (HH:MM)")
+    duration: str = Field(..., description="Duration string like '2h 45m' or '45m'")
     total_stops: StopsEnum
     additional_info: str = Field(default="No info")
 
     @model_validator(mode='after')
-    def validate_source_destination(self) -> "FlightPredictorRequest":
+    def validate_source_destination(self) -> "FlightPredictionRequest":
         if self.source == self.destination:
             raise ValueError(
                 f"Source and destination cannot be the same: {self.source.value}"
             )
         return self
 
-    def to_dateframe(self):
+    def to_dataframe(self):
         """Convert request to DataFrame for feature engineering pipeline."""
         import pandas as pd
         return pd.DataFrame([{
@@ -74,11 +74,11 @@ class FlightPredictionRequest(BaseModel):
         }])
         
 ## Response Schema:
-class FlightPredictionResponse(BaseModle):
+class FlightPredictionResponse(BaseModel):
     predicted_price_inr: float = Field(..., description="predicted price in INR")
-    predicted_type: str=Field(...,description="Which predictor was used")
-    status: str=Field(default = "success")
-    request_id: str=Field(..., description="Correlation ID for this requset")
+    predictor_type: str = Field(..., description="Which predictor was used")
+    status: str = Field(default="success")
+    request_id: str = Field(..., description="Correlation ID for this request")
 
 class HealthResponse(BaseModel):
     status: Literal["healthy", "degraded", "unhealthy"]
