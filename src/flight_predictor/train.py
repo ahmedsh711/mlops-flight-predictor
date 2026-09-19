@@ -17,30 +17,30 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import TransformedTargetRegressor as TTR
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from xgboost import XGBRegressor
 
 from flight_predictor.config import (
+    CV_FOLDS,
+    MODEL_INFO_PATH,
     MODELS_DIR,
     PIPELINE_PATH,
-    MODEL_INFO_PATH,
     PRICE_COLUMN,
-    RANDOM_SEED,
     R2_THRESHOLD,
+    RANDOM_SEED,
     TEST_SIZE,
-    CV_FOLDS
 )
-
 from flight_predictor.data import load_raw_data
 from flight_predictor.features import (
-    engineer_features,
     build_preprocessor,
-    get_feature_columns
+    engineer_features,
+    get_feature_columns,
 )
 
 logger = logging.getLogger(__name__)
+
 
 def build_pipeline(xgb_params: dict[str, Any] | None = None) -> Pipeline:
     if xgb_params is None:
@@ -52,25 +52,22 @@ def build_pipeline(xgb_params: dict[str, Any] | None = None) -> Pipeline:
             "colsample_bytree": 0.8,
             "random_state": RANDOM_SEED,
             "n_jobs": -1,
-            "tree_method": "hist",   
+            "tree_method": "hist",
         }
 
     preprocessor = build_preprocessor()
 
     # TTR wraps XGBoost — applies log1p before fit, expm1 after predict
     ttr_model = TTR(
-        regressor = XGBRegressor(**xgb_params),
-        func = np.log1p,
-        inverse_func = np.expm1
+        regressor=XGBRegressor(**xgb_params), func=np.log1p, inverse_func=np.expm1
     )
 
-    return Pipeline([
-        ("preprocessor", preprocessor),
-        ('model', ttr_model)
-    ])
+    return Pipeline([("preprocessor", preprocessor), ("model", ttr_model)])
 
 
-def evaluate_model(pipeline : Pipeline, X_test: pd.DataFrame, y_test: pd.Series) -> dict[str, float]:
+def evaluate_model(
+    pipeline: Pipeline, X_test: pd.DataFrame, y_test: pd.Series
+) -> dict[str, float]:
     y_pred = pipeline.predict(X_test)
 
     r2 = r2_score(y_test, y_pred)
@@ -80,8 +77,9 @@ def evaluate_model(pipeline : Pipeline, X_test: pd.DataFrame, y_test: pd.Series)
     return {
         "r2_inr_space": round(r2, 4),
         "rmse_inr": round(rmse, 4),
-        "mae_inr": round(mae, 4)
+        "mae_inr": round(mae, 4),
     }
+
 
 def train(data_path: Path | None = None) -> dict[str, Any]:
     """
@@ -94,7 +92,7 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
         ValueError: If trained model fails R² threshold.
     """
 
-    #1- Load and validate raw data
+    # 1- Load and validate raw data
     logger.info("Starting flight price model training")
     df_raw = load_raw_data(data_path)
 
@@ -112,12 +110,12 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
 
     # 3- Train/test split
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size = TEST_SIZE, random_state=RANDOM_SEED
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_SEED
     )
 
     logger.info(
         "Data Split Complete",
-        extra = {"train_size": len(X_train), "test_size": len(X_test)}
+        extra={"train_size": len(X_train), "test_size": len(X_test)},
     )
 
     # 4- Build pipeline
@@ -126,15 +124,14 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
     # 5- Cross_validation
     logger.info(f"Running {CV_FOLDS}-fold cross-validation..")
     cv_scores = cross_val_score(
-        pipeline, X_train, y_train,
-        cv=CV_FOLDS, scoring="r2", n_jobs = -1
+        pipeline, X_train, y_train, cv=CV_FOLDS, scoring="r2", n_jobs=-1
     )
     logger.info(
         "Cross-validation complete",
         extra={
             "cv_mean_r2": round(cv_scores.mean(), 4),
-            "cv_std_r2" : round(cv_scores.std(), 4)
-        }
+            "cv_std_r2": round(cv_scores.std(), 4),
+        },
     )
 
     # 6- Final training on full training set:
@@ -158,7 +155,7 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
 
     # Save preprocessor separetly (for onnx export):
     preprocessor_fitted = pipeline.named_steps["preprocessor"]
-    joblib.dump(preprocessor_fitted, MODELS_DIR/ "preprocessor.joblib")
+    joblib.dump(preprocessor_fitted, MODELS_DIR / "preprocessor.joblib")
 
     # save model info
     model_info = {
@@ -172,7 +169,7 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
         "xgb_params": {
             k: (None if isinstance(v, float) and np.isnan(v) else v)
             for k, v in pipeline.named_steps["model"].regressor.get_params().items()
-        }
+        },
     }
 
     with open(MODEL_INFO_PATH, "w") as f:
@@ -180,19 +177,22 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
 
     logger.info(
         "Training complete. Artifact saved.",
-        extra={"pipeline_path": str(PIPELINE_PATH), **metrics}
+        extra={"pipeline_path": str(PIPELINE_PATH), **metrics},
     )
 
     return model_info
 
+
 def main() -> None:
     from flight_predictor.logging_conf import setup_logging
+
     setup_logging()
     info = train()
-    print(f"\n Training Complete!")
+    print("\n Training Complete!")
     print(f" R2 = {info['metrics']['r2_inr_space']:.4f}")
     print(f" RMSE = {info['metrics']['rmse_inr']:.0f}")
     print(f" MAE = {info['metrics']['mae_inr']:.0f}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

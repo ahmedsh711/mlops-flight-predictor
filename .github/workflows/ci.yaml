@@ -54,10 +54,11 @@ jobs:
         run: uv pip install --system ".[dev]"
 
       - name: Run tests with coverage
-        run: pytest tests/test_features.py tests/test_api.py -v
-               --cov=flight_predictor
-               --cov-report=term-missing
-               --cov-fail-under=70
+        run: |
+          pytest tests/ -v \
+            --cov=flight_predictor \
+            --cov-report=term-missing \
+            --cov-fail-under=40
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v4

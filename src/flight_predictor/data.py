@@ -5,20 +5,29 @@ import pandas as pd
 
 from flight_predictor.config import (
     DATA_RAW_DIR,
+    MAX_PRICE_INR,
+    MIN_PRICE_INR,
     PRICE_COLUMN,
     RARE_AIRLINES,
-    MIN_PRICE_INR,
-    MAX_PRICE_INR
 )
 
 logger = logging.getLogger(__name__)
 
 # Required columns from the raw csv
 REQUIRED_COLUMNS = [
-    "Airline","Date_of_Journey", "Source","Destination",
-    "Route", "Dep_Time", "Arrival_Time", "Duration",
-    "Total_Stops", "Additional_Info", "Price"
+    "Airline",
+    "Date_of_Journey",
+    "Source",
+    "Destination",
+    "Route",
+    "Dep_Time",
+    "Arrival_Time",
+    "Duration",
+    "Total_Stops",
+    "Additional_Info",
+    "Price",
 ]
+
 
 def load_raw_data(path: Path | None = None) -> pd.DataFrame:
     """
@@ -39,9 +48,8 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
 
     if not path.exists():
         raise FileNotFoundError(
-            f"Flight data not found at {path}."
-            "Copy your CSV to data/raw/flight_data.csv"
-        ) 
+            f"Flight data not found at {path}.Copy your CSV to data/raw/flight_data.csv"
+        )
 
     logger.info("Loading flight data", extra={"path": str(path)})
     df = pd.read_csv(path)
@@ -50,8 +58,7 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
     missing = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing:
         raise ValueError(
-            f"CSV is missing required columns: {missing}. "
-            f"Found: {list(df.columns)}"
+            f"CSV is missing required columns: {missing}. Found: {list(df.columns)}"
         )
 
     # Basic shape validation:
@@ -60,32 +67,28 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
             f"Dataset too small: {len(df)} rows. "
             "Need at least 100 rows for meaningful training. "
         )
-    
+
     # Map rare airlines to "Other" before returning raw data
-    df['Airline'] = df['Airline'].apply(
-        lambda a: "Other" if a in RARE_AIRLINES else a
-    )
+    df["Airline"] = df["Airline"].apply(lambda a: "Other" if a in RARE_AIRLINES else a)
 
     # Remove obvious price outliers:
     if PRICE_COLUMN in df.columns:
         n_before = len(df)
 
         df = df[
-            (df[PRICE_COLUMN] >= MIN_PRICE_INR) &
-            (df[PRICE_COLUMN] <= MAX_PRICE_INR)
+            (df[PRICE_COLUMN] >= MIN_PRICE_INR) & (df[PRICE_COLUMN] <= MAX_PRICE_INR)
         ]
 
         n_dropped = n_before - len(df)
         if n_dropped > 0:
             logger.warning(
                 "Dropped price outliers",
-                extra={"n_dropped": n_dropped, "remaining": len(df)}
+                extra={"n_dropped": n_dropped, "remaining": len(df)},
             )
 
     logger.info(
         "Data loaded sucessfully",
-        extra={"n_rows": len(df), "n_columns": len(df.columns)}
+        extra={"n_rows": len(df), "n_columns": len(df.columns)},
     )
-    
+
     return df
-    

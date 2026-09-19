@@ -3,19 +3,19 @@ Integration tests for the FastAPI endpoints.
 Uses a mocked predictor — tests API routing and validation logic,
 not model accuracy (that's covered in test_serialization.py).
 """
-import pytest
 
 VALID_PAYLOAD = {
-    "airline":         "IndiGo",
+    "airline": "IndiGo",
     "date_of_journey": "15/06/2024",
-    "source":          "Delhi",
-    "destination":     "Bangalore",
-    "dep_time":        "06:00",
-    "arrival_time":    "08:45",
-    "duration":        "2h 45m",
-    "total_stops":     "non-stop",
+    "source": "Delhi",
+    "destination": "Bangalore",
+    "dep_time": "06:00",
+    "arrival_time": "08:45",
+    "duration": "2h 45m",
+    "total_stops": "non-stop",
     "additional_info": "No info",
 }
+
 
 class TestHealthEndpoint:
     def test_health_returns_200_when_model_loaded(self, test_client):
@@ -26,7 +26,8 @@ class TestHealthEndpoint:
         assert data["model_loaded"] is True
 
     def test_health_return_503_when_model_not_loaded(self, test_client):
-        from api.main  import app_state
+        from api.main import app_state
+
         original = app_state.pop("predictor", None)
         try:
             response = test_client.get("/health")
@@ -45,13 +46,13 @@ class TestPredictorEndpoint:
         response = test_client.post("/predict", json=VALID_PAYLOAD)
         data = response.json()
         assert "predicted_price_inr" in data
-        assert data['predicted_price_inr'] == 5500.0 # from mock
+        assert data["predicted_price_inr"] == 5500.0  # from mock
 
     def test_response_contains_request_id(self, test_client):
         response = test_client.post("/predict", json=VALID_PAYLOAD)
         data = response.json()
         assert "request_id" in data
-        assert len(data['request_id']) > 0
+        assert len(data["request_id"]) > 0
 
     def test_missing_required_field_returns_422(self, test_client):
         payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "airline"}
@@ -73,14 +74,15 @@ class TestPredictorEndpoint:
         response = test_client.post("/predict", json=payload)
         assert response.status_code == 422
 
+
 class TestBatchPredictEndpoint:
     def test_batch_predict_multiple_flight(self, test_client):
         payload = [VALID_PAYLOAD, {**VALID_PAYLOAD, "airline": "Air India"}]
         response = test_client.post("/predict/batch", json=payload)
         assert response.status_code == 200
         data = response.json()
-        assert data['total'] == 2
-        assert len(data['predictions']) == 2
+        assert data["total"] == 2
+        assert len(data["predictions"]) == 2
 
     def test_batch_rejects_non_list(self, test_client):
         response = test_client.post("/predict/batch", json=VALID_PAYLOAD)

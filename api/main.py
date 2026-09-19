@@ -22,7 +22,7 @@ from flight_predictor.config import API_TITLE, API_VERSION, MODEL_INFO_PATH
 from flight_predictor.logging_conf import (
     CorrelationIDMiddleware,
     get_correlation_id,
-    setup_logging
+    setup_logging,
 )
 from flight_predictor.predict import BaseFlightPredictor, load_predictor
 
@@ -32,13 +32,13 @@ logger = logging.getLogger(__name__)
 # Store the loaded predictor - shared across all request
 app_state: dict[str, Any] = {}
 
+
 # Lifespan:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup:
     setup_logging(
-        level=os.getenv("LOG_LEVEL", "INFO"),
-        fmt=os.getenv("LOG_FORMAT", "json")
+        level=os.getenv("LOG_LEVEL", "INFO"), fmt=os.getenv("LOG_FORMAT", "json")
     )
     logger.info("Flight Price starting up ...")
 
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
             app_state["predictor"] = predictor
             logger.info(
                 "Predictor loaded sucessfully",
-                extra={'predictor_type': predictor.__class__.__name__}
+                extra={"predictor_type": predictor.__class__.__name__},
             )
         except FileNotFoundError as e:
             logger.error(f"Failed to load predictor: {e}")
@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
     ## Shutdown
     logger.info("Flight Price API shutting down ...")
     app_state.clear()
+
 
 ## FastAPI App:
 app = FastAPI(
@@ -77,7 +78,7 @@ app = FastAPI(
     XGBoost with log1p target transformation (TransformedTargetRegressor).
     Baseline R² = 0.7598. Target R² > 0.80 after bug fixes.
     """,
-    lifespan=lifespan    
+    lifespan=lifespan,
 )
 
 # Middleware:
@@ -86,8 +87,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["GET", "POST"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
+
 
 ## Routes:
 @app.get("/health", response_model=None, tags=["Infrastructure"])
@@ -99,8 +101,8 @@ async def health_check():
             content={
                 "status": "unhealthy",
                 "model_loaded": False,
-                "version": API_VERSION
-            }
+                "version": API_VERSION,
+            },
         )
     return JSONResponse(
         status_code=200,
@@ -108,27 +110,30 @@ async def health_check():
             "status": "healthy",
             "model_loaded": True,
             "predictor_type": predictor.__class__.__name__,
-            "version": API_VERSION
-        }
+            "version": API_VERSION,
+        },
     )
+
 
 @app.get("/model-info", tags=["Infrastructure"])
 async def model_info():
     if not MODEL_INFO_PATH.exists():
         raise HTTPException(
             status_code=404,
-            detail="model_info.json not found. Run `flight-train` first."
+            detail="model_info.json not found. Run `flight-train` first.",
         )
 
     with open(MODEL_INFO_PATH) as f:
         content = f.read().replace(": NaN", ": null").replace(": nan", ": null")
         info = json.loads(content)
-    
+
     return info
+
 
 @app.post("/predict", tags=["prediction"])
 async def predict(request: Request):
     from api.schemas import FlightPredictionRequest, FlightPredictionResponse
+
     # Parse and validate request body
     body = await request.json()
     try:
@@ -140,8 +145,7 @@ async def predict(request: Request):
     predictor: BaseFlightPredictor | None = app_state.get("predictor")
     if predictor is None:
         raise HTTPException(
-            status_code=503,
-            detail="Model not loaded. Check /health for details."
+            status_code=503, detail="Model not loaded. Check /health for details."
         )
 
     # Convert request to DataFrame and predict
@@ -161,19 +165,17 @@ async def predict(request: Request):
             "source": flight_request.source.value,
             "destination": flight_request.destination.value,
             "duration": flight_request.duration,
-            "stops": flight_request.total_stops.value
-        }
+            "stops": flight_request.total_stops.value,
+        },
     )
 
-    return FlightPredictionResponse(
-        **result,
-        request_id=get_correlation_id()
-    )
+    return FlightPredictionResponse(**result, request_id=get_correlation_id())
+
 
 @app.post("/predict/batch", tags=["Prediction"])
 async def predict_batch(request: Request):
     from api.schemas import FlightPredictionRequest
-    
+
     body = await request.json()
     if not isinstance(body, list):
         raise HTTPException(status_code=422, detail="Body must be a JSON array")
@@ -181,8 +183,7 @@ async def predict_batch(request: Request):
     predictor: BaseFlightPredictor | None = app_state.get("predictor")
     if predictor is None:
         raise HTTPException(
-            status_code=503,
-            detail="Model not loaded. Check /health for details."
+            status_code=503, detail="Model not loaded. Check /health for details."
         )
 
     results = []

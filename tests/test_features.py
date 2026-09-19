@@ -3,15 +3,14 @@ Unit tests for feature engineering functions.
 These test pure functions — no I/O, no model loading.
 Fast to run: ~0.1 seconds total.
 """
-import pytest
 
-from flight_predictor.features import(
+from flight_predictor.features import (
+    engineer_features,
+    get_airport_coords,
     parse_duration_to_minutes,
     parse_stops,
-    engineer_features,
-    compute_route_distance,
-    get_airport_coords
 )
+
 
 # parse_duration_to_minutes:
 class TestParseDuration:
@@ -26,29 +25,31 @@ class TestParseDuration:
 
     def test_already_numeric(self):
         assert parse_duration_to_minutes("150") == 150
-    
+
     def test_large_duration(self):
         assert parse_duration_to_minutes("12h 30m") == 750
-    
+
     def test_short_flight(self):
         assert parse_duration_to_minutes("50m") == 50
 
     def test_string_coercion(self):
-        assert parse_duration_to_minutes(165) == 165 # integer input
+        assert parse_duration_to_minutes(165) == 165  # integer input
+
 
 ## parse_stops:
 class TestParseStops:
     def test_non_stops(self):
         assert parse_stops("non-stops") == 0
-    
+
     def test_one_stop(self):
         assert parse_stops("1 stop") == 1
-    
+
     def test_two_stops(self):
         assert parse_stops("2 stops") == 2
 
     def test_case_insensitive(self):
         assert parse_stops("Non-Stop") == 0
+
 
 ## get_airport_coords
 class TestAirportCoords:
@@ -66,6 +67,7 @@ class TestAirportCoords:
         lat1, _ = get_airport_coords("DEL")
         lat2, _ = get_airport_coords("del")
         assert lat1 == lat2
+
 
 ## engineer_features:
 class TestEngineerFeatures:
@@ -87,7 +89,7 @@ class TestEngineerFeatures:
         assert "dep_hour" in result.columns
 
     def test_price_column_not_required(self, sample_df):
-        df_no_price = sample_df.drop(columns = ["Price"], errors="ignore")
+        df_no_price = sample_df.drop(columns=["Price"], errors="ignore")
         result = engineer_features(df_no_price)
         assert "duration_minutes" in result.columns
 
