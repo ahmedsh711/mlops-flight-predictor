@@ -2,12 +2,13 @@ import os
 from pathlib import Path
 
 # Project Root
-# __file__ = .../src/flight_predictor/config.py
-# .parent = .../src/flight_predictor/
-# .parent = .../src/
-# .parent = .../mlops-flight-predictor/
-
-ROOT_DIR = Path(__file__).parent.parent.parent
+# Project Root
+if os.getenv("PROJECT_ROOT"):
+    ROOT_DIR = Path(os.environ["PROJECT_ROOT"]).resolve()
+elif (Path.cwd() / "pyproject.toml").exists() or (Path.cwd() / "data").exists():
+    ROOT_DIR = Path.cwd().resolve()
+else:
+    ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
 
 # Data Paths:
 DATA_DIR = ROOT_DIR / "data"
