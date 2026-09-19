@@ -82,6 +82,7 @@ def train_with_tracking(
     y_train: pd.Series,
     y_test: pd.Series
 ) -> tuple[str, float]:
+
     with mlflow.start_run(run_name=config["name"]) as run:
         # Log Configuration Metadata:
         mlflow.set_tag("config_name", config["name"])
@@ -106,6 +107,7 @@ def train_with_tracking(
             pipeline, X_train, y_train,
             cv=CV_FOLDS, scoring='r2', n_jobs=-1
         )
+        
         mlflow.log_metric("cv_mean_r2", cv_scores.mean())
         mlflow.log_metric("cv_std_r2", cv_scores.std())
 

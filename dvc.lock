@@ -1,0 +1,74 @@
+schema: '2.0'
+stages:
+  process:
+    cmd: python -c "from flight_predictor.data import load_raw_data; from 
+      flight_predictor.features import engineer_features; df = 
+      engineer_features(load_raw_data()); 
+      df.to_parquet('data/processed/features.parquet', index=False)"
+    deps:
+    - path: data/raw/flight_data.csv
+      hash: md5
+      md5: ea995518999e47766c19cedb8b1510bf
+      size: 1096473
+      isexec: true
+    - path: src/flight_predictor/data.py
+      hash: md5
+      md5: caaa9306bdcdd98afa78c495410195eb
+      size: 2385
+    - path: src/flight_predictor/features.py
+      hash: md5
+      md5: da79198c40cf0520b171379ab14ac3f0
+      size: 6001
+    outs:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: 523c51a90ecb4123c3f82b16da2ae191
+      size: 204784
+  train:
+    cmd: flight-train
+    deps:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: 523c51a90ecb4123c3f82b16da2ae191
+      size: 204784
+    - path: src/flight_predictor/config.py
+      hash: md5
+      md5: 1d2efaca8bfdbfb60e62152348ea8acd
+      size: 2171
+    - path: src/flight_predictor/train.py
+      hash: md5
+      md5: 07ff511258576ec2b2ea4ffa02df94f8
+      size: 5802
+    outs:
+    - path: models/model_info.json
+      hash: md5
+      md5: 0f4fb6d8754496e7a729a90f95fd640f
+      size: 1338
+    - path: models/pipeline.joblib
+      hash: md5
+      md5: 8ed0b4b5a68c42062283a476537a6d9f
+      size: 1328202
+    - path: models/preprocessor.joblib
+      hash: md5
+      md5: 9ff170f823808828a949b3906f09538b
+      size: 3958
+  export:
+    cmd: flight-export
+    deps:
+    - path: models/pipeline.joblib
+      hash: md5
+      md5: 8ed0b4b5a68c42062283a476537a6d9f
+      size: 1328202
+    - path: models/preprocessor.joblib
+      hash: md5
+      md5: 9ff170f823808828a949b3906f09538b
+      size: 3958
+    - path: src/flight_predictor/export.py
+      hash: md5
+      md5: 17bd83a0a0eeba3fde9128df6f0a051b
+      size: 4232
+    outs:
+    - path: models/xgb_model.onnx
+      hash: md5
+      md5: 8d8cc7a02aa026b80ae0e3503119a091
+      size: 1052443

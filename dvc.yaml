@@ -1,0 +1,35 @@
+stages:
+
+  # ── Stage 1: Process raw data ───────────────────────────────────────────────
+  process:
+    cmd: python -c "from flight_predictor.data import load_raw_data; from flight_predictor.features import engineer_features; df = engineer_features(load_raw_data()); df.to_parquet('data/processed/features.parquet', index=False)"
+    deps:
+      - data/raw/flight_data.csv          
+      - src/flight_predictor/data.py      
+      - src/flight_predictor/features.py  
+    outs:
+      - data/processed/features.parquet   # DVC tracks this output
+
+  ## Stage 2: Train model
+  train:
+    cmd: flight-train
+    deps:
+      - data/processed/features.parquet  # depends on process stage output
+      - src/flight_predictor/train.py
+      - src/flight_predictor/config.py
+    outs:
+      - models/pipeline.joblib
+      - models/preprocessor.joblib
+    metrics:
+      - models/model_info.json:           # DVC tracks this as a metric file
+          cache: false                    
+
+  ## Stage 3: Export to ONNX 
+  export:
+    cmd: flight-export
+    deps:
+      - models/pipeline.joblib
+      - models/preprocessor.joblib
+      - src/flight_predictor/export.py
+    outs:
+      - models/xgb_model.onnx

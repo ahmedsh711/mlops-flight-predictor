@@ -69,9 +69,10 @@ def export_to_onnx(
     with open(onnx_output_path, 'wb') as f:
         f.write(onnx_model.SerializeToString())
 
-    # Save preprocessor separately for onnx_predictor
+    # Save preprocessor separately for onnx_predictor (if not already saved by training)
     preprocessor_path = MODELS_DIR / "preprocessor.joblib"
-    joblib.dump(preprocessor, preprocessor_path)
+    if not preprocessor_path.exists():
+        joblib.dump(preprocessor, preprocessor_path)
 
     logger.info(
         "ONNX export complete",
