@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 # Project Root
@@ -23,14 +24,16 @@ PIPELINE_PATH     = MODELS_DIR / "pipeline.joblib"
 PREPROCESSOR_PATH = MODELS_DIR / "preprocessor.joblib"
 ONNX_MODEL_PATH   = MODELS_DIR / "xgb_model.onnx"
 MODEL_INFO_PATH   = MODELS_DIR / "model_info.json"
+PREV_BEST_PATH    = MODELS_DIR / "previous_best_r2.txt"
 
 # Reproducity:
 RANDOM_SEED = 42
 
-# Training:
+# Training & Quality Gate:
 TEST_SIZE = 0.2 # 80 20 TRAIN TEST SPLIT
 CV_FOLDS = 5 
-R2_THRESHOLD = 0.80
+R2_THRESHOLD = float(os.getenv("R2_THRESHOLD", "0.80"))
+MAX_REGRESSION_ALLOWED = float(os.getenv("MAX_REGRESSION_ALLOWED", "0.02"))
 MAX_PRICE_INR = 100_000 # SANITY CHECK 
 MIN_PRICE_INR = 500 # SANITY CHECK
 
