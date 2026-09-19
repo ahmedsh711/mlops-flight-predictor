@@ -19,11 +19,11 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Copy dependency spefication first (Docker layer caching):
 # If pyproject.toml doesn't change, this layer is cached — faster rebuilds
 WORKDIR /build
-COPY pyproject.toml .
+COPY pyproject.toml README.md ./
 COPY src/ src/
 
-#Install the package and its dependencies
-RUN uv pip install --no-cache ".[dev]"
+# Install the package and its dependencies
+RUN uv pip install --no-cache .
 
 
 ## STAGE 2: PRODUCTION - minimal image no build rools, Only what's needed to run the API

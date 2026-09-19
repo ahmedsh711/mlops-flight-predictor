@@ -9,6 +9,10 @@ on:
 env:
   PYTHON_VERSION: "3.11"
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
 
   ## Job 1: Lint & Type Check 
