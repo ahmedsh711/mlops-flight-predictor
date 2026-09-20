@@ -149,10 +149,17 @@ def train_with_tracking(
             logger.warning(f"Feature importance plot failed: {e}")
 
         # Log the sklearn pipeline — only register in MLflow Model Registry if R² passes threshold
+        import importlib.metadata
         mlflow.sklearn.log_model(
             pipeline,
             artifact_path="flight_price_model",
             serialization_format="cloudpickle",
+            pip_requirements=[
+                f"scikit-learn=={importlib.metadata.version('scikit-learn')}",
+                f"xgboost=={importlib.metadata.version('xgboost')}",
+                f"pandas=={importlib.metadata.version('pandas')}",
+                f"numpy=={importlib.metadata.version('numpy')}",
+            ],
             registered_model_name=REGISTERED_MODEL
             if metrics["r2_inr_space"] >= R2_THRESHOLD
             else None,
