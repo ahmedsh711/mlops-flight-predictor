@@ -47,3 +47,5 @@ Thumbs.db
 # DVC
 .dvc/cache
 .dvc/tmp
+.coverage
+data/processed/*.parquet
