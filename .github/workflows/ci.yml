@@ -1,6 +1,6 @@
 name: Flight Predictor CI
 
-on:
+"on":
   push:
     branches: [main, develop]
   pull_request:

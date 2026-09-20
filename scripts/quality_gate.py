@@ -30,13 +30,13 @@ def run_quality_gate(
     rmse = info["metrics"]["rmse_inr"]
     mae = info["metrics"]["mae_inr"]
 
-    print(f"\n{'='*50}")
-    print(f"  Flight Price Model — Quality Gate")
-    print(f"{'='*50}")
+    print(f"\n{'=' * 50}")
+    print("  Flight Price Model — Quality Gate")
+    print(f"{'=' * 50}")
     print(f"  R²   = {r2:.4f}  (threshold: >= {r2_floor:.4f})")
     print(f"  RMSE = ₹{rmse:,.0f}")
     print(f"  MAE  = ₹{mae:,.0f}")
-    print(f"{'='*50}\n")
+    print(f"{'=' * 50}\n")
 
     failures = []
 
@@ -59,9 +59,13 @@ def run_quality_gate(
                     f"Max allowed regression: {max_regression:.4f}."
                 )
             print(f"  Previous best R²: {prev_r2:.4f}")
-            print(f"  Regression check: {degradation:.4f} (allowed: {max_regression:.4f})")
+            print(
+                f"  Regression check: {degradation:.4f} (allowed: {max_regression:.4f})"
+            )
         except ValueError:
-            print(f"  (Warning: Could not parse {prev_best_path} — skipping regression check)")
+            print(
+                f"  (Warning: Could not parse {prev_best_path} — skipping regression check)"
+            )
     else:
         print("  (No previous best found — skipping regression check)")
 

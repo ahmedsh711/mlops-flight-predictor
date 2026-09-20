@@ -1,6 +1,6 @@
 name: Continuous Training — Flight Price Model
 
-on:
+"on":
   ## Trigger 1: Scheduled retraining
   schedule:
     - cron: "0 2 * * 1" # Weekly cadence ; can be adjusted based on how fast prices drift

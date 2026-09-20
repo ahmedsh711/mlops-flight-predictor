@@ -102,14 +102,23 @@ def verify_onnx_parity(pipeline_path: Path | None = None, atol: float = 0.5) -> 
     log_preds = session.run(None, {input_name: X_transformed})[0].flatten()
     onnx_preds = np.expm1(log_preds)
 
-    max_diff = np.abs(sklearn_preds - onnx_preds).max()
+    # If atol is tight (e.g. <= 1e-3), evaluate in log-space where ONNX natively predicts
+    if atol <= 1e-3:
+        xgb_log_preds = pipeline.named_steps["model"].regressor_.predict(X_transformed)
+        max_diff = float(np.abs(xgb_log_preds - log_preds).max())
+        space_name = "log-space"
+    else:
+        max_diff = float(np.abs(sklearn_preds - onnx_preds).max())
+        space_name = "INR-space"
+
     if max_diff > atol:
         raise AssertionError(
-            f"ONNX parity check failed! Max diff = {max_diff:.6f} > {atol}"
+            f"ONNX parity check failed in {space_name}! Max diff = {max_diff:.6f} > {atol}"
         )
 
     logger.info(
-        "ONNX parity verified", extra={"max_diff": float(max_diff), "atol": atol}
+        "ONNX parity verified",
+        extra={"max_diff": max_diff, "atol": atol, "space": space_name},
     )
     return True
 

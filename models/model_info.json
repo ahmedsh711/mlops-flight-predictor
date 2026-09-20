@@ -10,6 +10,8 @@
   "train_size": 8546,
   "r2_threshold": 0.8,
   "random_seed": 42,
+  "best_run_id": "7c99d27a462c456387f13d41bf5c166f",
+  "best_config": "xgb_baseline",
   "xgb_params": {
     "objective": "reg:squarederror",
     "base_score": null,
@@ -40,7 +42,7 @@
     "monotone_constraints": null,
     "multi_strategy": null,
     "n_estimators": 300,
-    "n_jobs": -1,
+    "n_jobs": null,
     "num_parallel_tree": null,
     "random_state": 42,
     "reg_alpha": null,
@@ -48,7 +50,7 @@
     "sampling_method": null,
     "scale_pos_weight": null,
     "subsample": 0.8,
-    "tree_method": "hist",
+    "tree_method": null,
     "validate_parameters": null,
     "verbosity": null
   }
