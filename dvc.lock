@@ -13,12 +13,12 @@ stages:
       isexec: true
     - path: src/flight_predictor/data.py
       hash: md5
-      md5: caaa9306bdcdd98afa78c495410195eb
-      size: 2385
+      md5: 9c0e7076e567d2b7e3188db2b30a77c2
+      size: 2354
     - path: src/flight_predictor/features.py
       hash: md5
-      md5: da79198c40cf0520b171379ab14ac3f0
-      size: 6001
+      md5: dee21bdaa31669463b0ebbb81823085c
+      size: 5947
     outs:
     - path: data/processed/features.parquet
       hash: md5
@@ -33,12 +33,12 @@ stages:
       size: 204784
     - path: src/flight_predictor/config.py
       hash: md5
-      md5: 1d2efaca8bfdbfb60e62152348ea8acd
-      size: 2171
+      md5: 98704be1f6cba546b14da7fe863eaddd
+      size: 2458
     - path: src/flight_predictor/train.py
       hash: md5
-      md5: 07ff511258576ec2b2ea4ffa02df94f8
-      size: 5802
+      md5: 843fd9d1085ce3ef647170ab181e3f26
+      size: 5759
     outs:
     - path: models/model_info.json
       hash: md5
@@ -65,10 +65,10 @@ stages:
       size: 3958
     - path: src/flight_predictor/export.py
       hash: md5
-      md5: 17bd83a0a0eeba3fde9128df6f0a051b
-      size: 4232
+      md5: 561d281d858a001f291b9daf415b7a9c
+      size: 4127
     outs:
     - path: models/xgb_model.onnx
       hash: md5
-      md5: 8d8cc7a02aa026b80ae0e3503119a091
+      md5: 914aab6750c00d6b4c87e7b85c8d9696
       size: 1052443

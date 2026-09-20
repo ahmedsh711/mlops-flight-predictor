@@ -1,0 +1,198 @@
+name: Continuous Training — Flight Price Model
+
+on:
+  ## Trigger 1: Scheduled retraining
+  schedule:
+    - cron: "0 2 * * 1" # Weekly cadence ; can be adjusted based on how fast prices drift
+
+  ## Trigger 2: Manual trigger (for testing or emergency retraining)
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are you triggering manual retraining?"
+        required: true
+        default: "manual-trigger"
+
+  ## Trigger 3: Drift detection 
+  # When our drift detector (like: Evidently AI or Prometheus) detects that production predictions have drifted significantly, it fires a repository_dispatch event with event_type: "drift-detected". This workflow picks it up.
+  repository_dispatch:
+    types: [drift-detected]
+
+env:
+  PYTHON_VERSION: "3.11"
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+  EXPERIMENT_NAME: "flight-price-prediction"
+
+jobs:
+
+  ## Job 1: Retrain the model 
+  retrain:
+    name: Retrain Flight Price Model
+    runs-on: ubuntu-latest
+    outputs:
+      r2_score:  ${{ steps.train.outputs.r2_score }}
+      run_id:    ${{ steps.train.outputs.run_id }}
+      triggered_by: ${{ steps.context.outputs.triggered_by }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: uv pip install --system ".[dev,experiments]"
+
+      # Capture trigger context 
+      - name: Capture trigger context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "triggered_by=scheduled-weekly" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "triggered_by=manual-${{ github.event.inputs.reason }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "triggered_by=drift-detected" >> $GITHUB_OUTPUT
+          fi
+
+      # Pull latest data via DVC 
+      - name: Pull latest training data
+        run: |
+          uv pip install --system "dvc[s3]"
+          dvc pull data/raw/flight_data.csv
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Run training with MLflow tracking 
+      - name: Train model with MLflow tracking
+        id: train
+        run: |
+          python experiments/train_with_mlflow.py 2>&1 | tee train.log
+
+          # Extract R² and run_id from model_info.json
+          R2=$(python -c "import json; print(json.load(open('models/model_info.json'))['metrics']['r2_inr_space'])")
+          echo "r2_score=$R2" >> $GITHUB_OUTPUT
+          echo "Trained model R² = $R2"
+        env:
+          MLFLOW_TRACKING_URI: ${{ env.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ env.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ env.MLFLOW_TRACKING_PASSWORD }}
+
+      # Quality gate
+      - name: Run quality gate
+        run: python scripts/quality_gate.py
+
+      # Upload artifacts
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ct-model-${{ github.run_id }}
+          path: |
+            models/pipeline.joblib
+            models/preprocessor.joblib
+            models/model_info.json
+          retention-days: 30
+
+      # Push updated model back to DVC
+      - name: Push model artifacts to DVC
+        run: |
+          dvc add models/pipeline.joblib models/preprocessor.joblib
+          dvc push
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add models/*.dvc
+          git commit -m "chore(ct): update model artifacts [run ${{ github.run_id }}]" || echo "Nothing to commit"
+          git push
+        env:
+          GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Post training summary 
+      - name: Post training summary
+        run: |
+          echo "## Continuous Training Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | ${{ steps.context.outputs.triggered_by }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| R² (INR space) | ${{ steps.train.outputs.r2_score }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Threshold | 0.80 |" >> $GITHUB_STEP_SUMMARY
+          echo "| MLflow experiment | ${{ env.EXPERIMENT_NAME }} |" >> $GITHUB_STEP_SUMMARY
+
+  ## Job 2: Human approval gate before Staging 
+  approve-staging:
+    name: Approve Staging Promotion
+    needs: retrain
+    runs-on: ubuntu-latest
+    environment: staging        
+    steps:
+      - name: Staging promotion approved
+        run: |
+          echo "Human approved staging promotion"
+          echo "Model R² = ${{ needs.retrain.outputs.r2_score }}"
+          echo "Triggered by: ${{ needs.retrain.outputs.triggered_by }}"
+
+  ## Job 3: Promote to Staging in MLflow registry
+  promote-staging:
+    name: Promote Model to Staging
+    needs: [retrain, approve-staging]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install MLflow
+        run: pip install mlflow
+
+      - name: Promote to Staging
+        run: |
+          python - <<'EOF'
+          import mlflow
+          import os
+
+          client = mlflow.tracking.MlflowClient(
+              tracking_uri=os.environ["MLFLOW_TRACKING_URI"]
+          )
+
+          # Find the latest registered version that isn't yet in Staging
+          versions = client.search_model_versions("name='FlightPricePredictor'")
+          none_versions = [v for v in versions if v.current_stage == "None"]
+
+          if not none_versions:
+              print("No new model version found to promote.")
+              exit(0)
+
+          # Promote the most recently created version
+          latest = max(none_versions, key=lambda v: int(v.version))
+          client.transition_model_version_stage(
+              name="FlightPricePredictor",
+              version=latest.version,
+              stage="Staging",
+              archive_existing_versions=False,
+          )
+          print(f"Version {latest.version} promoted to Staging")
+          EOF
+        env:
+          MLFLOW_TRACKING_URI: ${{ env.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ env.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ env.MLFLOW_TRACKING_PASSWORD }}
+
+      - name: Notify team
+        run: |
+          echo "## Model Promoted to Staging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Model R² = **${{ needs.retrain.outputs.r2_score }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Next step: A human must promote from Staging → Production" >> $GITHUB_STEP_SUMMARY
+          echo "via the MLflow UI or the model registry API." >> $GITHUB_STEP_SUMMARY
