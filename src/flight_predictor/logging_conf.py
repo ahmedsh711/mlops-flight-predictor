@@ -5,7 +5,7 @@ from contextvars import ContextVar
 
 import structlog
 
-## Correlation ID Context Variable: - ContextVar is safe for concurrent requests; each request has its own value
+# ContextVar is safe for concurrent requests — each request carries its own correlation ID
 correlation_id_var: ContextVar[str] = ContextVar("correlation_id", default="no-request")
 
 
@@ -60,12 +60,11 @@ def setup_logging(level: str = "INFO", fmt: str = "json") -> None:
     root_logger.handlers = [handler]
     root_logger.setLevel(log_level)
 
-    # Quiet Noisy libraries:
+    # Silence noisy libraries that log at INFO by default
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("xgboost").setLevel(logging.WARNING)
 
 
-# FastAPI Middleware:
 class CorrelationIDMiddleware:
     """
     ASGI middleware that assigns a unique correlation_id to every request.

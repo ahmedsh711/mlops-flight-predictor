@@ -69,7 +69,6 @@ def sklearn_pipeline():
     return joblib.load(PIPELINE_PATH)
 
 
-## Mock predictor fixture
 @pytest.fixture
 def mock_predictor():
     predictor = MagicMock()
@@ -83,22 +82,19 @@ def mock_predictor():
     return predictor
 
 
-## FastAPI test client fixture
 @pytest.fixture
 def test_client(mock_predictor):
     """
     FastAPI TestClient with the real app but a mocked predictor.
-    The lifespan is bypassed ; we inject the mock directly.
+    The lifespan is bypassed; we inject the mock directly.
     """
     from fastapi.testclient import TestClient
 
     from api.main import app, app_state
 
-    # Inject Mock Predictor directly into app_state
     app_state["predictor"] = mock_predictor
 
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
-    # Clean Up after test
     app_state.pop("predictor", None)

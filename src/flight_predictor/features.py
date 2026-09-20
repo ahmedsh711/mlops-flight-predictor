@@ -23,7 +23,7 @@ def parse_duration_to_minutes(duration: str) -> int:
     m = int(mins_match.group(1)) if mins_match else 0
 
     if h == 0 and m == 0:
-        # Unkown format - return 0 and let the model handle it
+        # Unknown format - return 0 and let the model handle it
         return 0
 
     return h * 60 + m

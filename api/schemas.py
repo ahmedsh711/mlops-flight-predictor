@@ -92,7 +92,7 @@ class FlightPredictionResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["healthy", "degraded", "unhealthy"]
     model_loaded: bool
-    prediction_type: str
+    predictor_type: str
     version: str
 
 
@@ -100,6 +100,6 @@ class ModelInferenceResponse(BaseModel):
     r2_inr_space: float
     rmse_inr: float
     mae_inr: float
-    featur_count: int
+    feature_count: int
     train_size: int
     r2_threshold: float

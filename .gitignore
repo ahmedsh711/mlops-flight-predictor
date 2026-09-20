@@ -23,10 +23,10 @@ models/*.joblib
 models/*.onnx
 models/*.pkl
 
-# Secerts 
+# Secrets
 .env
 *.env
-secerts/
+secrets/
 credentials.json
 
 # MLflow artifacts

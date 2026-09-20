@@ -58,7 +58,7 @@ class TestAirportCoords:
         assert abs(lat - 12.9716) < 0.01
         assert abs(lon - 77.5946) < 0.01
 
-    def test_unkown_airport_fallback(self):
+    def test_unknown_airport_fallback(self):
         lat, lon = get_airport_coords("XYZ")
         assert lat == 0.0
         assert lon == 0.0

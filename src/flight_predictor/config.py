@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 # Project Root
-# Project Root
 if os.getenv("PROJECT_ROOT"):
     ROOT_DIR = Path(os.environ["PROJECT_ROOT"]).resolve()
 elif (Path.cwd() / "pyproject.toml").exists() or (Path.cwd() / "data").exists():
@@ -10,24 +9,24 @@ elif (Path.cwd() / "pyproject.toml").exists() or (Path.cwd() / "data").exists():
 else:
     ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
 
-# Data Paths:
+# Data Paths
 DATA_DIR = ROOT_DIR / "data"
 DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_PROC_DIR = DATA_DIR / "processed"
 MODELS_DIR = ROOT_DIR / "models"
 
-# Create directories if they don't exist:
+# Create directories if they do not exist
 for _dir in [DATA_RAW_DIR, DATA_PROC_DIR, MODELS_DIR]:
     _dir.mkdir(parents=True, exist_ok=True)
 
-# Models Artifact Paths:
+# Model Artifact Paths
 PIPELINE_PATH = MODELS_DIR / "pipeline.joblib"
 PREPROCESSOR_PATH = MODELS_DIR / "preprocessor.joblib"
 ONNX_MODEL_PATH = MODELS_DIR / "xgb_model.onnx"
 MODEL_INFO_PATH = MODELS_DIR / "model_info.json"
 PREV_BEST_PATH = MODELS_DIR / "previous_best_r2.txt"
 
-# Reproducity:
+# Reproducibility
 RANDOM_SEED = 42
 
 # Training & Quality Gate:

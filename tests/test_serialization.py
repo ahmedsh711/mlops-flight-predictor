@@ -33,7 +33,7 @@ def sample_engineered_features():
         df = engineer_features(df_raw)
         return df[get_feature_columns()].head(50)
     except FileNotFoundError:
-        pytest.skip("Training data not avaliable")
+        pytest.skip("Training data not available")
 
 
 class TestOnnxParity:

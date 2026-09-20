@@ -1,11 +1,9 @@
 """
 Training pipeline for the flight price prediction model.
 
-Key design decisions:
-1. TransformedTargetRegressor wraps XGBoost — handles log1p/expm1 automatically
-2. Pipeline combines preprocessor + model — saved as one artifact
-3. R² threshold enforced — prevents deploying a worse model
-4. Seeded for reproducibility — same result every run
+XGBoost is wrapped in a TransformedTargetRegressor (TTR) so that log1p/expm1
+are applied automatically during fit/predict. The full preprocessing + model
+pipeline is saved as a single artifact to prevent train/serve skew.
 """
 
 import json
@@ -92,15 +90,15 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
         ValueError: If trained model fails R² threshold.
     """
 
-    # 1- Load and validate raw data
+    # Load and validate raw data
     logger.info("Starting flight price model training")
     df_raw = load_raw_data(data_path)
 
-    # 2- Feature_Engineering:
+    # Feature engineering
     df = engineer_features(df_raw)
     feature_cols = get_feature_columns()
 
-    # validate all feature columns exist after engineering
+    # Validate all feature columns exist after engineering
     missing_feats = set(feature_cols) - set(df.columns)
     if missing_feats:
         raise ValueError(f"Missing feature columns after engineering: {missing_feats}")
@@ -108,21 +106,21 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
     X = df[feature_cols]
     y = df[PRICE_COLUMN].astype(float)
 
-    # 3- Train/test split
+    # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_SEED
     )
 
     logger.info(
-        "Data Split Complete",
+        "Data split complete",
         extra={"train_size": len(X_train), "test_size": len(X_test)},
     )
 
-    # 4- Build pipeline
+    # Build model pipeline
     pipeline = build_pipeline()
 
-    # 5- Cross_validation
-    logger.info(f"Running {CV_FOLDS}-fold cross-validation..")
+    # Cross-validation
+    logger.info(f"Running {CV_FOLDS}-fold cross-validation...")
     cv_scores = cross_val_score(
         pipeline, X_train, y_train, cv=CV_FOLDS, scoring="r2", n_jobs=-1
     )
@@ -134,14 +132,14 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
         },
     )
 
-    # 6- Final training on full training set:
+    # Final fit on full training split
     pipeline.fit(X_train, y_train)
 
-    # 7- Evaluate on held-out test set
+    # Evaluate on held-out test split
     metrics = evaluate_model(pipeline, X_test, y_test)
-    logger.info("Test evaluation Complete", extra=metrics)
+    logger.info("Test evaluation complete", extra=metrics)
 
-    # 8- Enforce Quality Gate:
+    # Enforce quality gate
     r2 = metrics["r2_inr_space"]
     if r2 < R2_THRESHOLD:
         raise ValueError(
@@ -149,15 +147,15 @@ def train(data_path: Path | None = None) -> dict[str, Any]:
             "Review your features and hyperparameters before deploying."
         )
 
-    # 9- Saving Artifact:
+    # Save model artifacts
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, PIPELINE_PATH)
 
-    # Save preprocessor separetly (for onnx export):
+    # Save preprocessor separately for ONNX export
     preprocessor_fitted = pipeline.named_steps["preprocessor"]
     joblib.dump(preprocessor_fitted, MODELS_DIR / "preprocessor.joblib")
 
-    # save model info
+    # Save model metadata and evaluation metrics
     model_info = {
         "metrics": metrics,
         "cv_mean_r2": round(cv_scores.mean(), 4),

@@ -31,12 +31,12 @@ from flight_predictor.train import build_pipeline, evaluate_model
 
 logger = logging.getLogger(__name__)
 
-# Mlflow Configuration:
+# MLflow configuration
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME", "flight-price-prediction")
 REGISTERED_MODEL = "FlightPricePredictor"
 
-# Hyperparameter configurations to try:
+# Hyperparameter configs to try across training runs
 CONFIGS = [
     {
         "name": "xgb_baseline",
@@ -88,7 +88,6 @@ def train_with_tracking(
 ) -> tuple[str, float, Pipeline, dict[str, Any], np.ndarray, dict[str, Any]]:
 
     with mlflow.start_run(run_name=config["name"]) as run:
-        # Log Configuration Metadata:
         mlflow.set_tag("config_name", config["name"])
         mlflow.set_tag("description", config["description"])
         mlflow.set_tag("model_type", "XGBoost + TransformedTargetRegressor")
@@ -103,10 +102,9 @@ def train_with_tracking(
         mlflow.log_param("n_test", len(X_test))
         mlflow.log_param("n_features", X_train.shape[1])
 
-        # Build pipeline with TTR
         pipeline = build_pipeline(config["params"])
 
-        # Cross validation
+        # Cross-validation
         cv_scores = cross_val_score(
             pipeline, X_train, y_train, cv=CV_FOLDS, scoring="r2", n_jobs=-1
         )
@@ -114,16 +112,16 @@ def train_with_tracking(
         mlflow.log_metric("cv_mean_r2", cv_scores.mean())
         mlflow.log_metric("cv_std_r2", cv_scores.std())
 
-        # Final fit
+        # Final fit on full training split
         pipeline.fit(X_train, y_train)
 
-        # Evaluate in INR Space:
+        # Evaluate in INR space (TTR already applies expm1, so predict() returns INR)
         metrics = evaluate_model(pipeline, X_test, y_test)
         mlflow.log_metric("r2_inr_space", metrics["r2_inr_space"])
         mlflow.log_metric("rmse_inr", metrics["rmse_inr"])
         mlflow.log_metric("mae_inr", metrics["mae_inr"])
 
-        # Feature importance plot:
+        # Feature importance plot
         try:
             import matplotlib.pyplot as plt
 
@@ -150,7 +148,7 @@ def train_with_tracking(
         except Exception as e:
             logger.warning(f"Feature importance plot failed: {e}")
 
-        # Log Sklearn Model:
+        # Log the sklearn pipeline — only register in MLflow Model Registry if R² passes threshold
         mlflow.sklearn.log_model(
             pipeline,
             artifact_path="flight_price_model",
@@ -199,14 +197,13 @@ def promote_best_model(best_run_id: str) -> None:
 def main() -> None:
     setup_logging()
 
-    # Connect to Mlflow
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     experiment = mlflow.set_experiment(EXPERIMENT_NAME)
     logger.info(
-        f"Mlflow experiment: {EXPERIMENT_NAME} (ID: {experiment.experiment_id})"
+        f"MLflow experiment: {EXPERIMENT_NAME} (ID: {experiment.experiment_id})"
     )
 
-    # Prepare data (once, shared across all runs for fair comparsion)
+    # Prepare data (once, shared across all runs for fair comparison)
     df_raw = load_raw_data()
     df = engineer_features(df_raw)
     feature_cols = get_feature_columns()

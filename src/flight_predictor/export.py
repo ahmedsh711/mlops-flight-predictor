@@ -25,7 +25,7 @@ def export_to_onnx(
 
     if not pipeline_path.exists():
         raise FileNotFoundError(
-            f"pipeline not found at {pipeline_path}.Run `flight-train` first."
+            f"Pipeline not found at {pipeline_path}. Run `flight-train` first."
         )
 
     # Load trained sklearn pipeline
@@ -48,11 +48,11 @@ def export_to_onnx(
 
     logger.info("Exporting XGBoost to ONNX", extra={"n_features": n_features})
 
-    # convert XGBoost -> ONNX
+    # convert XGBoost to ONNX
     initial_type = [("float_input", FloatTensorType([None, n_features]))]
     onnx_model = convert_xgboost(xgb_model, initial_types=initial_type)
 
-    # Save ONNX MODEL
+    # Write ONNX model to disk
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     with open(onnx_output_path, "wb") as f:
         f.write(onnx_model.SerializeToString())
@@ -130,7 +130,7 @@ def main() -> None:
     path = export_to_onnx()
     print(f"\n ONNX model exported to: {path}")
     verify_onnx_parity()
-    print("Onnx parity verified (Sklearn ~ ONNX Predictions)")
+    print("ONNX parity verified (sklearn ≈ ONNX predictions)")
 
 
 if __name__ == "__main__":

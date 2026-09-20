@@ -14,7 +14,7 @@ from flight_predictor.features import engineer_features, get_feature_columns
 logger = logging.getLogger(__name__)
 
 
-# Abstract Base Class:
+# Base class — both sklearn and ONNX predictors implement this contract
 class BaseFlightPredictor(ABC):
     @abstractmethod
     def predict(self, input_df: pd.DataFrame) -> float: ...
@@ -32,7 +32,6 @@ class BaseFlightPredictor(ABC):
             raise RuntimeError(f"Prediction failed: {e}") from e
 
 
-## Sklearn Pipeline Predictor
 class SklearnPredictor(BaseFlightPredictor):
     def __init__(self, model_path: Path | None = None) -> None:
         path = model_path or PIPELINE_PATH
@@ -51,7 +50,6 @@ class SklearnPredictor(BaseFlightPredictor):
         return float(price[0])
 
 
-## ONNX Predictor
 class OnnxPredictor(BaseFlightPredictor):
     def __init__(
         self, onnx_path: Path | None = None, preprocessor_path: Path | None = None
@@ -63,7 +61,7 @@ class OnnxPredictor(BaseFlightPredictor):
 
         if not onnx_path.exists():
             raise FileNotFoundError(
-                f"ONNX model not found at {onnx_path}.Run `flight-export` first."
+                f"ONNX model not found at {onnx_path}. Run `flight-export` first."
             )
 
         if not preprocessor_path.exists():
@@ -82,10 +80,10 @@ class OnnxPredictor(BaseFlightPredictor):
         feature_cols = get_feature_columns()
         X = features[feature_cols]
 
-        # Sklearn preprocessor : handle ohe + scaling
+        # apply sklearn preprocessor: OHE + scaling
         X_transformed = self._preprocessor.transform(X).astype(np.float32)
 
-        # ONNX inference: return log-scale price
+        # ONNX returns log-scale price — invert with expm1
         outputs = self._session.run(None, {self._input_name: X_transformed})
 
         log_price = outputs[0].flatten()[0]
@@ -93,7 +91,7 @@ class OnnxPredictor(BaseFlightPredictor):
         return float(np.expm1(log_price))
 
 
-# Factory Function for FastAPI startup:
+# Factory Function for FastAPI startup
 def load_predictor(use_onnx: bool = False) -> BaseFlightPredictor:
     """
     Factory that returns the appropriate predictor.

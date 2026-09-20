@@ -1,11 +1,9 @@
 """
 FastAPI application for the Flight Price Prediction API.
 
-Key design patterns:
-1. Lifespan context manager — model loaded ONCE at startup, not per-request
-2. CorrelationIDMiddleware — every request gets a unique trace ID
-3. Pydantic schemas — all inputs validated before prediction code runs
-4. Proper HTTP status codes — 200 success, 422 validation error, 500 server error
+The model is loaded once at startup via a lifespan context manager and shared
+across all requests. Each request gets a unique correlation ID via middleware.
+Inputs are validated with Pydantic before any prediction code runs.
 """
 
 import json
@@ -28,15 +26,13 @@ from flight_predictor.predict import BaseFlightPredictor, load_predictor
 
 logger = logging.getLogger(__name__)
 
-## Application State:
-# Store the loaded predictor - shared across all request
+# Shared predictor instance — loaded once at startup, reused for every request
 app_state: dict[str, Any] = {}
 
 
-# Lifespan:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup:
+    # Startup
     setup_logging(
         level=os.getenv("LOG_LEVEL", "INFO"), fmt=os.getenv("LOG_FORMAT", "json")
     )
@@ -48,23 +44,22 @@ async def lifespan(app: FastAPI):
             predictor = load_predictor(use_onnx=use_onnx)
             app_state["predictor"] = predictor
             logger.info(
-                "Predictor loaded sucessfully",
+                "Predictor loaded successfully",
                 extra={"predictor_type": predictor.__class__.__name__},
             )
         except FileNotFoundError as e:
             logger.error(f"Failed to load predictor: {e}")
-            # App starts but prediction will return 503
+            # App starts in degraded mode; /predict returns 503 until model is available
             app_state["predictor"] = None
             app_state["load_error"] = str(e)
 
     yield
 
-    ## Shutdown
+    # Shutdown
     logger.info("Flight Price API shutting down ...")
     app_state.clear()
 
 
-## FastAPI App:
 app = FastAPI(
     title=API_TITLE,
     version=API_VERSION,
@@ -81,7 +76,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Middleware:
 app.add_middleware(CorrelationIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -91,7 +85,6 @@ app.add_middleware(
 )
 
 
-## Routes:
 @app.get("/health", response_model=None, tags=["Infrastructure"])
 async def health_check():
     predictor = app_state.get("predictor")
@@ -130,7 +123,7 @@ async def model_info():
     return info
 
 
-@app.post("/predict", tags=["prediction"])
+@app.post("/predict", tags=["Prediction"])
 async def predict(request: Request):
     from api.schemas import FlightPredictionRequest, FlightPredictionResponse
 

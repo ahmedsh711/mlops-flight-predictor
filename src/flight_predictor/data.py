@@ -48,7 +48,7 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
 
     if not path.exists():
         raise FileNotFoundError(
-            f"Flight data not found at {path}.Copy your CSV to data/raw/flight_data.csv"
+            f"Flight data not found at {path}. Copy your CSV to data/raw/flight_data.csv"
         )
 
     logger.info("Loading flight data", extra={"path": str(path)})
@@ -61,17 +61,17 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
             f"CSV is missing required columns: {missing}. Found: {list(df.columns)}"
         )
 
-    # Basic shape validation:
+    # Basic shape validation
     if len(df) < 100:
         raise ValueError(
             f"Dataset too small: {len(df)} rows. "
-            "Need at least 100 rows for meaningful training. "
+            "Need at least 100 rows for meaningful training."
         )
 
     # Map rare airlines to "Other" before returning raw data
     df["Airline"] = df["Airline"].apply(lambda a: "Other" if a in RARE_AIRLINES else a)
 
-    # Remove obvious price outliers:
+    # Remove obvious price outliers
     if PRICE_COLUMN in df.columns:
         n_before = len(df)
 
@@ -87,7 +87,7 @@ def load_raw_data(path: Path | None = None) -> pd.DataFrame:
             )
 
     logger.info(
-        "Data loaded sucessfully",
+        "Data loaded successfully",
         extra={"n_rows": len(df), "n_columns": len(df.columns)},
     )
 
