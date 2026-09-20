@@ -42,12 +42,12 @@ stages:
     outs:
     - path: models/model_info.json
       hash: md5
-      md5: 0f4fb6d8754496e7a729a90f95fd640f
-      size: 1338
+      md5: 9e160ce6469547e48129b59763c6bc9a
+      size: 1424
     - path: models/pipeline.joblib
       hash: md5
-      md5: 8ed0b4b5a68c42062283a476537a6d9f
-      size: 1328202
+      md5: 05dc9751bb42c51bb68edfa59b6b8d15
+      size: 1328185
     - path: models/preprocessor.joblib
       hash: md5
       md5: 9ff170f823808828a949b3906f09538b
