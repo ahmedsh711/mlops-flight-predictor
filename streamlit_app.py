@@ -105,15 +105,28 @@ def load_model():
         return None
 
     try:
+        import mlflow
         import mlflow.sklearn
 
         os.environ["MLFLOW_TRACKING_URI"] = DAGSHUB_MLFLOW_URI
         os.environ["MLFLOW_TRACKING_USERNAME"] = username
         os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
-        pipeline = mlflow.sklearn.load_model(f"models:/{REGISTERED_MODEL}/Staging")
+        mlflow.set_tracking_uri(DAGSHUB_MLFLOW_URI)
 
-        # Cache to disk so the next restart skips the download
+        # Try stage-based URI first (works in MLflow 2.x and still in 3.x)
+        try:
+            pipeline = mlflow.sklearn.load_model(f"models:/{REGISTERED_MODEL}/Staging")
+        except Exception:
+            # Fall back: find the staging version manually and load by run URI
+            client = mlflow.MlflowClient()
+            all_versions = client.search_model_versions(f"name='{REGISTERED_MODEL}'")
+            staging = [v for v in all_versions if v.current_stage == "Staging"]
+            if not staging:
+                raise ValueError(f"No Staging version found for '{REGISTERED_MODEL}'")
+            run_id = staging[0].run_id
+            pipeline = mlflow.sklearn.load_model(f"runs:/{run_id}/flight_price_model")
+
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
         joblib.dump(pipeline, PIPELINE_PATH)
         return pipeline
@@ -147,12 +160,16 @@ def get_model_info():
         os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
         client = mlflow.MlflowClient()
-        versions = client.get_latest_versions(REGISTERED_MODEL, stages=["Staging"])
-        if not versions:
+
+        # search_model_versions works in both MLflow 2.x and 3.x
+        all_versions = client.search_model_versions(f"name='{REGISTERED_MODEL}'")
+        staging = [v for v in all_versions if v.current_stage == "Staging"]
+        if not staging:
             return None
 
-        run = client.get_run(versions[0].run_id)
+        run = client.get_run(staging[0].run_id)
         m = run.data.metrics
+        p = run.data.params
         return {
             "metrics": {
                 "r2_inr_space": m.get("r2_inr_space", 0),
@@ -161,8 +178,8 @@ def get_model_info():
             },
             "cv_mean_r2": m.get("cv_mean_r2", 0),
             "cv_std_r2": m.get("cv_std_r2", 0),
-            "feature_count": int(run.data.params.get("n_features", 0)),
-            "train_size": int(run.data.params.get("n_train", 0)),
+            "feature_count": int(p.get("n_features", 0)),
+            "train_size": int(p.get("n_train", 0)),
         }
     except Exception:
         return None
