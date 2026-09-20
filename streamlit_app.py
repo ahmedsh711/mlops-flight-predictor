@@ -75,10 +75,16 @@ st.markdown(
 
 
 # ── Model loader (cached so it only loads once) ───────────────────────────────
-DAGSHUB_REPO = "ahmedsh711/mlops-flight-predictor"
-DAGSHUB_MODEL_URL = (
-    f"https://dagshub.com/{DAGSHUB_REPO}/raw/main/models/pipeline.joblib"
-)
+DAGSHUB_MLFLOW_URI = "https://dagshub.com/ahmedsh711/mlops-flight-predictor.mlflow"
+REGISTERED_MODEL = "FlightPricePredictor"
+
+
+def _get_secret(key: str) -> str:
+    """Read a value from st.secrets first, then fall back to env vars."""
+    try:
+        return st.secrets[key]
+    except (KeyError, FileNotFoundError):
+        return os.getenv(key, "")
 
 
 @st.cache_resource(show_spinner="Loading model…")
@@ -87,34 +93,33 @@ def load_model():
 
     from flight_predictor.config import MODELS_DIR, PIPELINE_PATH
 
-    # If artifact already exists locally (local dev or if committed), use it
+    # Local dev — artifact already on disk
     if PIPELINE_PATH.exists():
         return joblib.load(PIPELINE_PATH)
 
-    # On Streamlit Cloud the model isn't in git (DVC tracks it), so we
-    # try to pull it from DagsHub. Requires DAGSHUB_TOKEN in st.secrets.
-    token = st.secrets.get("DAGSHUB_TOKEN", os.getenv("DAGSHUB_TOKEN", ""))
-    if not token:
+    # Streamlit Cloud — pull from MLflow Model Registry on DagsHub
+    username = _get_secret("MLFLOW_TRACKING_USERNAME")
+    password = _get_secret("MLFLOW_TRACKING_PASSWORD")
+
+    if not username or not password:
         return None
 
     try:
-        import io
+        import mlflow.sklearn
 
-        import requests
+        os.environ["MLFLOW_TRACKING_URI"] = DAGSHUB_MLFLOW_URI
+        os.environ["MLFLOW_TRACKING_USERNAME"] = username
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
-        headers = {"Authorization": f"token {token}"}
-        resp = requests.get(DAGSHUB_MODEL_URL, headers=headers, timeout=30)
-        resp.raise_for_status()
+        pipeline = mlflow.sklearn.load_model(f"models:/{REGISTERED_MODEL}/Staging")
 
+        # Cache to disk so the next restart skips the download
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        model_bytes = io.BytesIO(resp.content)
-        pipeline = joblib.load(model_bytes)
-
-        # Cache to disk so subsequent calls skip the download
         joblib.dump(pipeline, PIPELINE_PATH)
         return pipeline
+
     except Exception as e:
-        st.warning(f"Could not fetch model from DagsHub: {e}", icon="⚠️")
+        st.warning(f"Could not load model from MLflow registry: {e}", icon="⚠️")
         return None
 
 
@@ -124,10 +129,43 @@ def get_model_info():
 
     from flight_predictor.config import MODEL_INFO_PATH
 
-    if not MODEL_INFO_PATH.exists():
+    if MODEL_INFO_PATH.exists():
+        with open(MODEL_INFO_PATH) as f:
+            return json.load(f)
+
+    # On Streamlit Cloud, try to get metrics from the MLflow registry
+    username = _get_secret("MLFLOW_TRACKING_USERNAME")
+    password = _get_secret("MLFLOW_TRACKING_PASSWORD")
+    if not username or not password:
         return None
-    with open(MODEL_INFO_PATH) as f:
-        return json.load(f)
+
+    try:
+        import mlflow
+
+        os.environ["MLFLOW_TRACKING_URI"] = DAGSHUB_MLFLOW_URI
+        os.environ["MLFLOW_TRACKING_USERNAME"] = username
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = password
+
+        client = mlflow.MlflowClient()
+        versions = client.get_latest_versions(REGISTERED_MODEL, stages=["Staging"])
+        if not versions:
+            return None
+
+        run = client.get_run(versions[0].run_id)
+        m = run.data.metrics
+        return {
+            "metrics": {
+                "r2_inr_space": m.get("r2_inr_space", 0),
+                "rmse_inr": m.get("rmse_inr", 0),
+                "mae_inr": m.get("mae_inr", 0),
+            },
+            "cv_mean_r2": m.get("cv_mean_r2", 0),
+            "cv_std_r2": m.get("cv_std_r2", 0),
+            "feature_count": int(run.data.params.get("n_features", 0)),
+            "train_size": int(run.data.params.get("n_train", 0)),
+        }
+    except Exception:
+        return None
 
 
 def predict_price(pipeline, form_data: dict) -> float:
@@ -202,14 +240,18 @@ model_info = get_model_info()
 
 if pipeline is None:
     st.error(
-        "**Model not loaded.** The `pipeline.joblib` artifact was not found.",
+        "**Model not loaded.** The pipeline artifact was not found locally and "
+        "could not be fetched from the MLflow registry.",
         icon="🚨",
     )
     st.info(
-        "**Running on Streamlit Cloud?** Add your DagsHub token as a secret:\n\n"
-        "1. Go to **App settings → Secrets** in Streamlit Cloud\n"
-        "2. Add `DAGSHUB_TOKEN = \"your_token_here\"`\n"
-        "3. Restart the app — the model will be fetched automatically.",
+        "**Running on Streamlit Cloud?** Add these three secrets under "
+        "**App settings → Secrets**:\n\n"
+        "```toml\n"
+        'MLFLOW_TRACKING_USERNAME = "ahmedsh711"\n'
+        'MLFLOW_TRACKING_PASSWORD = "your_dagshub_token"\n'
+        "```\n\n"
+        "The app will pull the model from the MLflow Model Registry on DagsHub automatically.",
         icon="🔑",
     )
     st.stop()
