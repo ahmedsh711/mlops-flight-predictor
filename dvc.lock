@@ -13,12 +13,12 @@ stages:
       isexec: true
     - path: src/flight_predictor/data.py
       hash: md5
-      md5: 9c0e7076e567d2b7e3188db2b30a77c2
-      size: 2354
+      md5: 905e531086c6e3778e03dafcde5c9fae
+      size: 2353
     - path: src/flight_predictor/features.py
       hash: md5
-      md5: dee21bdaa31669463b0ebbb81823085c
-      size: 5947
+      md5: fdb79a7fc0a7d5ea42fdddf540db1fb3
+      size: 5948
     outs:
     - path: data/processed/features.parquet
       hash: md5
@@ -33,42 +33,42 @@ stages:
       size: 204784
     - path: src/flight_predictor/config.py
       hash: md5
-      md5: 98704be1f6cba546b14da7fe863eaddd
-      size: 2458
+      md5: 9bd7e55f0dc38f4578cdda6ed74e64b5
+      size: 2443
     - path: src/flight_predictor/train.py
       hash: md5
-      md5: 843fd9d1085ce3ef647170ab181e3f26
-      size: 5759
+      md5: 14659ce282f74529bb637261b73b3cbb
+      size: 5695
     outs:
     - path: models/model_info.json
       hash: md5
-      md5: 9e160ce6469547e48129b59763c6bc9a
+      md5: 927218e31b7515bc01966cbea69256c7
       size: 1424
     - path: models/pipeline.joblib
       hash: md5
-      md5: 05dc9751bb42c51bb68edfa59b6b8d15
+      md5: 0cea07af60abd33d16f08ccb629bb521
       size: 1328185
     - path: models/preprocessor.joblib
       hash: md5
-      md5: 9ff170f823808828a949b3906f09538b
+      md5: da98b06f14f7ec2e6394d693c7f99c05
       size: 3958
   export:
     cmd: flight-export
     deps:
     - path: models/pipeline.joblib
       hash: md5
-      md5: 8ed0b4b5a68c42062283a476537a6d9f
-      size: 1328202
+      md5: 0cea07af60abd33d16f08ccb629bb521
+      size: 1328185
     - path: models/preprocessor.joblib
       hash: md5
-      md5: 9ff170f823808828a949b3906f09538b
+      md5: da98b06f14f7ec2e6394d693c7f99c05
       size: 3958
     - path: src/flight_predictor/export.py
       hash: md5
-      md5: 561d281d858a001f291b9daf415b7a9c
-      size: 4127
+      md5: 5fbdfc564a4d8f88f7f30f950baa4f10
+      size: 4531
     outs:
     - path: models/xgb_model.onnx
       hash: md5
-      md5: 914aab6750c00d6b4c87e7b85c8d9696
+      md5: 4a17cf8ffb5a1557550b7386bbc337d5
       size: 1052443
