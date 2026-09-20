@@ -103,11 +103,11 @@ jobs:
       # Push updated model back to DVC
       - name: Push model artifacts to DVC
         run: |
-          dvc add models/pipeline.joblib models/preprocessor.joblib
+          dvc commit
           dvc push
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add models/*.dvc
+          git add dvc.lock
           git commit -m "chore(ct): update model artifacts [run ${{ github.run_id }}]" || echo "Nothing to commit"
           git push
         env:
