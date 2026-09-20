@@ -1,4 +1,4 @@
-# ✈️ End-to-End MLOps Flight Price Predictor
+# ✈️ Flight Price Predictor — An End-to-End MLOps Journey
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
 [![MLflow](https://img.shields.io/badge/MLflow-Tracking-blue.svg)](https://mlflow.org/)
@@ -6,20 +6,36 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B.svg)](https://streamlit.io/)
 [![CI/CD](https://github.com/ahmedsh711/mlops-flight-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedsh711/mlops-flight-predictor/actions)
 
-A complete, production-ready Machine Learning Operations (MLOps) pipeline for predicting domestic flight prices in India. This project demonstrates advanced data science feature engineering coupled with enterprise-grade MLOps automation, continuous training, and dynamic model serving.
+Welcome to the **Flight Price Predictor**! This repository isn't just a machine learning model—it's a fully automated, production-ready MLOps system built from scratch. 
 
-## 🌟 Key Features
+Predicting flight prices is notoriously difficult because they are highly volatile and heavily right-skewed. The goal of this project was to move beyond just building a predictive model in a Jupyter Notebook and instead engineer a complete lifecycle: from data versioning and continuous training to dynamic serving in the cloud.
 
-*   **Robust ML Pipeline:** Custom `ColumnTransformer` (OneHotEncoding, StandardScaler) unified with an `XGBoost` regressor to prevent training-serving skew.
-*   **Target Transformation:** Wraps the model in a `TransformedTargetRegressor` (using `log1p`) to handle heavily right-skewed flight prices, drastically improving $R^2$.
-*   **Spatial & Temporal Engineering:** Hand-crafted Haversine distance calculations and advanced temporal extractions from raw timestamps.
-*   **Data & Model Versioning (DVC):** Tracks raw data, processed data, and serialized models (`.joblib`, `.onnx`) using DVC backed by AWS S3.
-*   **Experiment Tracking (MLflow):** Integrates with DagsHub MLflow to automatically log hyperparameters, metrics, and models.
-*   **Continuous Training (CT):** A fully automated GitHub Actions workflow that pulls data, repros the DVC pipeline, trains the model, exports it to ONNX, and pushes the new lockfile back to Git.
-*   **Dynamic Model Registry:** CI/CD automatically promotes models to the `Staging` stage if they pass the $R^2 \ge 0.80$ quality gate.
-*   **Lightning Fast Deployment:** Uses `uv` for 17-second dependency resolution on Streamlit Cloud, dynamically fetching the latest model from the MLflow registry on boot.
+---
+
+## 📖 Table of Contents
+- [The Problem We're Solving](#-the-problem-were-solving)
+- [System Architecture](#-system-architecture)
+- [Engineering Challenges & Solutions](#-engineering-challenges--solutions)
+- [Repository Structure](#-repository-structure)
+- [Getting Started (Run it Locally)](#-getting-started)
+
+---
+
+## 🎯 The Problem We're Solving
+Flight tickets fluctuate wildly based on time, route, and season. Most tutorials stop at training an algorithm. This project implements a real-world **Continuous Training (CT)** pipeline. 
+If the data changes, the system automatically pulls it, retrains the model, exports it, and pushes it to production without human intervention. 
+
+### Core Tech Stack:
+- **ML Framework:** Scikit-Learn, XGBoost
+- **MLOps:** DVC (Data Versioning), MLflow (Experiment Tracking), DagsHub
+- **CI/CD:** GitHub Actions
+- **Serving & UI:** FastAPI, Streamlit, `uv` (Package Manager)
+
+---
 
 ## 🏗️ System Architecture
+
+To ensure the model is scalable and reliable, the infrastructure is heavily decoupled:
 
 ```mermaid
 graph TD
@@ -29,77 +45,92 @@ graph TD
     classDef registry fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
     classDef deploy fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
 
-    subgraph Data Layer
-        A[(Raw Data)]:::data
+    subgraph Storage Layer
+        A[(Raw & Processed Data)]:::data
         B[(AWS S3 / DVC Remote)]:::data
         A -->|Tracked by| B
     end
 
-    subgraph GitHub Actions CI/CD Pipeline
-        C{Push / Manual Trigger}:::cicd
-        D[Lint & Test Ruff/Pytest]:::cicd
-        E[DVC Pull Latest Data]:::cicd
-        F[DVC Repro Preprocess]:::process
+    subgraph Automation CI/CD
+        C{GitHub Action Trigger}:::cicd
+        D[Lint & Pytest]:::cicd
+        E[DVC Repro Preprocess]:::process
+        F[XGBoost Training]:::process
         
         C --> D --> E --> F
-        E -->|Downloads Data| A
-    end
-
-    subgraph Training Pipeline
-        G[Feature Engineering]:::process
-        H[XGBoost Training pipeline.joblib]:::process
-        I[Quality Gate R2 >= 0.80]:::process
-        
-        F --> G --> H --> I
-        H -->|DVC Push Artifacts| B
     end
 
     subgraph MLflow on DagsHub
-        J[(Experiment Tracking)]:::registry
-        K[(Model Registry)]:::registry
-        L([Promote to Staging]):::registry
+        G[(Experiment Tracking)]:::registry
+        H[(Model Registry)]:::registry
+        I([Promote to Staging]):::registry
         
-        I -->|Log Metrics| J
-        I -->|If Pass| K --> L
+        F -->|Log Metrics| G
+        F -->|If R2 >= 0.80| H --> I
+        F -->|DVC Push Artifacts| B
     end
 
-    subgraph Production Deployment
-        M[FastAPI Backend]:::deploy
-        N[Streamlit Cloud UI]:::deploy
+    subgraph Production
+        J[FastAPI Backend]:::deploy
+        K[Streamlit Cloud UI]:::deploy
         
-        L -.->|Dynamically Fetches Model| M
-        L -.->|Dynamically Fetches Model| N
-        M <-->|API Requests| N
+        I -.->|Dynamically Fetches Model| J
+        I -.->|Dynamically Fetches Model| K
     end
 ```
+
+---
+
+## 💡 Engineering Challenges & Solutions
+
+Building an end-to-end pipeline comes with edge cases. Here’s how the hardest parts were solved:
+
+1. **Handling the "Long Tail" of Flight Prices:**
+   * **Challenge:** Airline prices are severely right-skewed (a few last-minute business class tickets can ruin the model's error metrics).
+   * **Solution:** Wrapped the `XGBoost` model inside a `TransformedTargetRegressor` to train on `log1p` prices and predict back to `expm1`. This drastically stabilized the predictions, achieving an $R^2$ of **0.84**.
+
+2. **Preventing Training-Serving Skew:**
+   * **Challenge:** If you preprocess data differently in production than in training, the model fails silently.
+   * **Solution:** Encapsulated the `ColumnTransformer` (OneHotEncoding, StandardScaler) directly into a unified Scikit-Learn `Pipeline`. The raw input hits the pipeline, and the prediction comes out. 
+
+3. **Ultra-Fast Cloud Boot Times:**
+   * **Challenge:** Streamlit Cloud can be painfully slow to boot up standard `pip` environments.
+   * **Solution:** Migrated the dependency resolver to `uv`, dropping the cold-boot environment setup to just **17 seconds** for 112 packages.
+
+4. **Dynamic Model Serving:**
+   * **Challenge:** Hardcoding model binaries into the repository causes Git bloat and requires full redeployments for every new model.
+   * **Solution:** The UI completely decouples the model. On boot, it authenticates with the MLflow API on DagsHub, searches for the latest model with the `Staging` alias, and caches it in RAM. 
+
+---
 
 ## 📂 Repository Structure
 
 ```text
 .
-├── .github/workflows/       # CI/CD and Continuous Training Actions
-├── data/
-│   ├── raw/                 # Raw CSV files (tracked by DVC)
-│   └── processed/           # Engineered features (tracked by DVC)
+├── .github/workflows/       # CI/CD and Continuous Training runners
+├── data/                    # Empty locally; hydrated via `dvc pull`
 ├── experiments/             # MLflow training scripts
 ├── models/                  # Serialized pipelines (joblib/ONNX)
 ├── src/flight_predictor/    # Core ML logic (features, train, evaluate)
 ├── api/                     # FastAPI backend
 ├── streamlit_app.py         # Streamlit UI
-├── dvc.yaml                 # DVC pipeline definition
-├── pyproject.toml           # Project metadata
-└── uv.lock                  # Deterministic lockfile
+├── dvc.yaml                 # DVC pipeline DAG
+└── uv.lock                  # Deterministic dependency lockfile
 ```
+
+---
 
 ## 🚀 Getting Started
 
+If you want to run this pipeline on your own machine, follow these steps:
+
 ### Prerequisites
 *   Python 3.11+
-*   [`uv`](https://github.com/astral-sh/uv) (Extremely fast Python package installer)
-*   A DagsHub account (for MLflow remote tracking)
+*   [`uv`](https://github.com/astral-sh/uv) installed
+*   A [DagsHub](https://dagshub.com/) account for remote tracking
 
 ### 1. Installation
-Clone the repository and install dependencies using `uv`:
+Clone the repo and sync the environment:
 ```bash
 git clone https://github.com/ahmedsh711/mlops-flight-predictor.git
 cd mlops-flight-predictor
@@ -107,41 +138,26 @@ uv sync
 source .venv/bin/activate
 ```
 
-### 2. Pull Data and Models
-The data and models are versioned with DVC. To download the latest versions from AWS S3:
+### 2. Pull the Data (AWS S3)
+Because data and models are versioned using DVC, you won't see them in Git. Pull them down:
 ```bash
 dvc pull
 ```
 
-### 3. Environment Variables
-Create a `.env` file in the root directory for MLflow authentication:
+### 3. Setup Credentials
+Create a `.env` file in the root directory:
 ```env
 MLFLOW_TRACKING_URI="https://dagshub.com/ahmedsh711/mlops-flight-predictor.mlflow"
-MLFLOW_TRACKING_USERNAME="your_dagshub_username"
-MLFLOW_TRACKING_PASSWORD="your_dagshub_password_or_token"
+MLFLOW_TRACKING_USERNAME="your_username"
+MLFLOW_TRACKING_PASSWORD="your_token"
 ```
 
-### 4. Run the Streamlit Application
-Start the interactive UI locally:
+### 4. Fire up the App!
+Run the Streamlit application locally:
 ```bash
 streamlit run streamlit_app.py
 ```
-*Note: The app will automatically connect to DagsHub, download the latest `Staging` model version, and cache it in RAM for instant inference.*
+*(The app will dynamically fetch the model from DagsHub and boot up!)*
 
-### 5. Run the Training Pipeline
-To retrain the model locally and track the experiment in MLflow:
-```bash
-dvc repro process
-python experiments/train_with_mlflow.py
-```
-
-## 🛠️ Continuous Training (CI/CD)
-
-This project features a fully automated Continuous Training (CT) loop. When triggered via GitHub Actions:
-1. The runner installs dependencies and pulls raw data.
-2. The ML pipeline is executed.
-3. The model is evaluated. If $R^2 \ge 0.80$, it is registered to MLflow.
-4. The model is exported to ONNX format.
-5. New model artifacts are committed via DVC and pushed to AWS S3.
-6. The updated `dvc.lock` is automatically committed and pushed back to the `main` branch.
-7. The model is transitioned to `Staging`, where the Streamlit app seamlessly picks it up.
+---
+*Built with ❤️ to explore the realities of production MLOps.*
