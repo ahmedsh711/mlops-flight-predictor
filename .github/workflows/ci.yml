@@ -58,7 +58,7 @@ jobs:
         run: uv pip install --system -e ".[dev]"
 
       - name: Pull data and models from DVC
-        run: dvc pull
+        run: dvc pull --allow-missing
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

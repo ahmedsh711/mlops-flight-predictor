@@ -65,7 +65,8 @@ jobs:
       - name: Pull latest training data
         run: |
           uv pip install --system "dvc[s3]"
-          dvc pull
+          dvc pull data/raw/flight_data.csv.dvc
+          dvc repro process
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
