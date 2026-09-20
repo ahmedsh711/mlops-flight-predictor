@@ -103,7 +103,7 @@ jobs:
       # Push updated model back to DVC
       - name: Push model artifacts to DVC
         run: |
-          dvc commit
+          dvc commit -f
           dvc push
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
