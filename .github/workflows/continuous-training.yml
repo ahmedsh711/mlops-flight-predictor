@@ -81,6 +81,9 @@ jobs:
           R2=$(python -c "import json; print(json.load(open('models/model_info.json'))['metrics']['r2_inr_space'])")
           echo "r2_score=$R2" >> $GITHUB_OUTPUT
           echo "Trained model R² = $R2"
+
+          # Export ONNX model so dvc commit doesn't fail
+          flight-export
         env:
           MLFLOW_TRACKING_URI: ${{ env.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ env.MLFLOW_TRACKING_USERNAME }}
