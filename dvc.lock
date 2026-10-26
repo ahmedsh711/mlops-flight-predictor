@@ -42,7 +42,7 @@ stages:
     outs:
     - path: models/model_info.json
       hash: md5
-      md5: f537cc67e6e6cb4f491cd3c6188bcb08
+      md5: db7f22b96a62af6067082207c9dba875
       size: 1424
     - path: models/pipeline.joblib
       hash: md5
@@ -70,5 +70,5 @@ stages:
     outs:
     - path: models/xgb_model.onnx
       hash: md5
-      md5: 471323dadecaead17f866c8dc2be4d16
+      md5: cec3dff1f690dffbdd62cbcd35d9b660
       size: 1052443
